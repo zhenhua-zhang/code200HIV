@@ -205,7 +205,7 @@ Discarded subjects
 	- age
 	- gender
 	- BMI (remove)
-	- smoking(packYears) (remove)
+	- Smoking(packYears, remove)
 
   - Need to be added
 	- % monocytes (200HIV50FG_SysmexPBMC_curated20190227.csv)
@@ -214,3 +214,5 @@ Discarded subjects
   - Unknown source
 	- CD4_NADIR
 	- HIV_DURATION
+
+

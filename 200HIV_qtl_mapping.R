@@ -6,10 +6,17 @@
 # @refer: qtl_mapping.R (Xiaojing Chu)
 # @date: 4th June, 2019
 
-# TODO 1: When doing inverse-rank transform, use mean to replace NA, which is
-#       dangerous. Need a better way to deal with
-# TODO 2: Make the script rescuable at broken-points
-# TODO 3: Add command arguments which is complementary to the second TODO
+
+# TODO: 1. When doing inverse-rank transform, use mean to replace NA, which is
+#           dangerous. Need a better way to deal with NAs
+#       2. Make the script rescuable at broken-points with additional command
+#           arguments
+
+
+# NOTE: 1. Settings in config file will be overrided by command line arguments
+#       2. Some settings is only modifiable by configuration files
+#		3. Keep the row as measurements, column as subjects
+
 
 library(qqman)
 library(dplyr)
@@ -24,10 +31,6 @@ library(MatrixEQTL)
 rm(list=ls())
 
 
-# NOTE: 1. Settings in config file will be overrided by command line arguments
-#       2. Some settings is only modifiable by configuration files
-#				3. Keep the row as measurements, column as subjects
-
 # Processing the configuration file
 prcs_cfg <- function(iptfl) {
 	cfglst <- list()
@@ -35,7 +38,9 @@ prcs_cfg <- function(iptfl) {
 	for(line in cfgs) {
 		if(!startsWith(line, "#") && !stri_isempty(line)){
 			plst <- strsplit(line, "=")
-			if(length(plst) != 1) {stop("[ERROR]  The length of plst should be 1")}
+			if(length(plst) != 1) {
+				stop("[ERROR]  The length of plst should be 1")
+			}
 			key <- plst[[1]][1]
 			val <- plst[[1]][2]
 			cfglst[[key]] <- val
@@ -44,43 +49,29 @@ prcs_cfg <- function(iptfl) {
 	return(cfglst)
 }
 
-# Check the exists for directory, files
-# TODO: not sure if useful
-ckexits <- function(p) {
-	perm <- 0
-	if(file.access(p, 0)) {
-		return(perm)
-	} else {
-		if(file.access(p, 1)) { perm = perm + 1 }
-		if(file.access(p, 2)) { perm = perm + 2 }
-		if(file.access(p, 4)) { perm = perm + 4 }
-	}
-	return(perm)
-}
-
 
 # Read file using fread() from data.table. Dealing with zipped files
 smt_fread <- function(flnm, zipped=FALSE, data.table=FALSE, header=TRUE,
-											stringsAsFactors=FALSE, verbose=FALSE,
-											showProgress=FALSE) {
+					  stringsAsFactors=FALSE, verbose=FALSE,
+					  showProgress=FALSE) {
 	#	cat("[INFO]  Reading\n          ", flnm, "\n")
 	if(zipped) {
 		return(fread(cmd=paste0("zcat < ", flnm), data.table=data.table,
-								 header=header, stringsAsFactors=stringsAsFactors,
-								 verbose=verbose, showProgress=showProgress 
-								 ))
+					 header=header, stringsAsFactors=stringsAsFactors,
+					 verbose=verbose, showProgress=showProgress 
+			 ))
 	} else {
 		return(fread(flnm, data.table=data.table, header=header,
-								 stringsAsFactors=stringsAsFactors, verbose=verbose,
-								 showProgress=showProgress 
-								 ))
+					 stringsAsFactors=stringsAsFactors, verbose=verbose,
+					 showProgress=showProgress 
+			 ))
 	}
 }
 
 # Preprocess
 # NOTE: 1. dscd working on columns, blck working on rows
 pprcs <- function(flnm, dscd=NULL, blck=NULL, trps=TRUE, as_idx="id",
-									zipped=FALSE) {
+				  zipped=FALSE) {
 	cat("[INFO]  Processing\n          ", flnm, "\n")
 
 	dtfm <- smt_fread(flnm, zipped=zipped)
@@ -111,13 +102,40 @@ pprcs <- function(flnm, dscd=NULL, blck=NULL, trps=TRUE, as_idx="id",
 	# dtfm <- dtfm[, !(base::colnames(dtfm) %in% c(as_idx))]
 
 	if(trps) {
-		cat("[WARN]  Will transpose dataframe: dtfrm\n")
+		cat("[WARN]  Will transpose dataframe: dtfm\n")
 		return(as.data.frame(t(dtfm), stringsAsFactors=FALSE))
 	} else {
 		return(dtfm)
 	}
 }
 
+
+###############################################################################
+##       Check the normality of each measuements                             ##
+###############################################################################
+chck_nmlt <- function(dtfm, hst_opt="Normality_check.pdf", bins=30) {
+	cat("[INFO]  Check the normality...\n")
+
+	if(!is.data.frame(dtfm)) { stop("[ERROR]  `dtfm` should be a dataframe ...") }
+
+	col_names <- sort(base::colnames(dtfm))
+	dtfm <- dtfm[col_names]
+	exp_mlt <- reshape2::melt(dtfm, id.vars='id')
+
+	nvars <- length(unique(exp_mlt["variable"])[[1]])
+	ncol <- as.integer(sqrt(nvars))
+
+	p <- ggplot(data=exp_mlt)
+	p <- p + geom_histogram(aes(x=value), na.rm=TRUE, bins=bins)
+	p <- p + facet_wrap(.~variable, ncol=ncol, scales="free")
+
+	ggsave(hst_opt, width=ncol*3, height=ncol*3)
+}
+
+
+###############################################################################
+##       Transform                                                           ##
+###############################################################################
 # Inverse rank normalization
 ivsrk <- function(x, lude.mode=TRUE){
 	is_na <- is.na(x)
@@ -138,14 +156,15 @@ ivsrk <- function(x, lude.mode=TRUE){
 }
 
 # Trans form log10 values into log2 values
-lg10tolg2 <- function(x) {
-	is_na <- is.na(x)
-	return(res * log2(10))
-}
+lg10tolg2 <- function(x) { return(x * log2(10)) }
+lg2tolg10 <- function(x) { return(x * log10(2)) }
 
+
+# NOTE: Make sure only the id column is characters, while the rest are numeric,
+#       otherwise, the transpose would fail
 # Transform non-normal distributed phnotype column into
 trfm_nmlt <- function(dtfm, dscd_cols=NULL, trfm_cols=NULL, trfm_mthd="log2",
-											trps=FALSE, idcol="id") {
+					  trps=FALSE, idcol="id") {
 	cat("[INFO]  Transform data by", trfm_mthd, "\n")
 	row_names <- base::rownames(dtfm)
 	dtfm[idcol] <- NULL
@@ -164,7 +183,7 @@ trfm_nmlt <- function(dtfm, dscd_cols=NULL, trfm_cols=NULL, trfm_mthd="log2",
 			ovlp_cols <- trfm_cols[which(dscd_cols %in% trfm_cols)]
 			if(length(ovlp_cols) != 0) {
 				stop("[ERROR]  Overlapped between dscd_cols and trfm_cols \n",
-						 ovlp_cols)
+					 ovlp_cols)
 			}
 		}
 
@@ -177,44 +196,21 @@ trfm_nmlt <- function(dtfm, dscd_cols=NULL, trfm_cols=NULL, trfm_mthd="log2",
 		} else {
 			dtfm[, trfm_cols] <- sapply(dtfm[, trfm_cols], trfm_mthd)
 		}
-		base::colnames(dtfm) <- sapply(col_names,
-																	 function(x) {
-																		 ifelse(x%in%trfm_cols,
-																						paste(x, trfm_mthd, sep="_"), x)
-																	 })
+		base::colnames(dtfm) <- sapply(col_names, 
+			function(x) {ifelse(x%in%trfm_cols, paste(x, trfm_mthd, sep="_"), x)}
+		)
 	} else {
 		cat("[WARN]  trfm_cols is either NULL or NA\n")
 	}
 
 	if(trps) {
-		cat("[INFO]  Will transpose dataframe: dtfrm \n")
+		cat("[INFO]  Will transpose dataframe: dtfm \n")
 		dtfm <- t(dtfm)
 	}
 
 	dtfm <- as.data.frame(scale(dtfm), stringsAsFactors=FALSE)
 	dtfm[idcol] <- row_names
 	return(dtfm)
-}
-
-
-# Check nomality
-chck_nmlt <- function(dtfm, hst_opt="Normality_check.pdf", bins=30) {
-	cat("[INFO]  Check the normality...\n")
-
-	if(!is.data.frame(dtfm)) { stop("[ERROR]  `dtfm` should be a dataframe ...") }
-
-	col_names <- sort(base::colnames(dtfm))
-	dtfm <- dtfm[col_names]
-	exp_mlt <- reshape2::melt(dtfm, id.vars='id')
-
-	nvars <- length(unique(exp_mlt["variable"])[[1]])
-	ncol <- as.integer(sqrt(nvars))
-
-	p <- ggplot(data=exp_mlt)
-	p <- p + geom_histogram(aes(x=value), na.rm=TRUE, bins=bins)
-	p <- p + facet_wrap(.~variable, ncol=ncol, scales="free")
-
-	ggsave(hst_opt, width=ncol*3, height=ncol*3)
 }
 
 
@@ -241,7 +237,7 @@ pltpca <- function(dtfm, opt_flnm="Outlier_check_PCA.pdf", idcol="id") {
 # A PCA analysis to remove outliers (out of 3*sd or 4*sd)
 prcs_otls <- function(dtfm, n_sd=3, trps=FALSE, idcol="id") {
 	cat("[INFO]  Removing outliers...\n")
-	row_names <- rownames(dtfm)
+	row_names <- base::rownames(dtfm)
 	dtfm[idcol] <- NULL
 
 	masked <- sapply(dtfm,
@@ -336,7 +332,7 @@ pltme <- function(qtls_lst, use_cols=NULL, otpt_prfx="qtl_mapping",
 	}
 
 	gwas_rslt <- qtls_lst[, use_cols]
-	colnames(gwas_rslt) <- c("SNP", "CHR", "BP", "P")
+	base::colnames(gwas_rslt) <- c("SNP", "CHR", "BP", "P")
 	otpt_flnm <- paste0(otpt_prfx, "_mhtn_pvalue.", svfmt)
 
 	if(svfmt=="png") { png(otpt_flnm, width=wdth, height=hght) }
@@ -394,7 +390,7 @@ ckmd <- function(dtfm, thrshld=0.5) {
 # TRY NOT BE COMPLICATED
 plt_dsg <- function(qtllst, pntp, gntp, gntp_ptn="*.dosage", gntp_zipped=TRUE,
 					svfmt="pdf", pvt=5e-8, qtl_col=NULL, gntp_blck_lst=NULL,
-					opt_dir="qtl_mapping_tmp_dir") {
+					opt_dir="qtl_mapping_output_dir/plots") {
 
 	# Fetch top snp on each chr, filted by pvalue
 	if(is.null(qtl_col)) { 
@@ -403,7 +399,7 @@ plt_dsg <- function(qtllst, pntp, gntp, gntp_ptn="*.dosage", gntp_zipped=TRUE,
 
 	qtllst <- qtllst[, qtl_col]
 	qtl_col <- c("snps", "gene", "pvalue", "chr", "pos", "ref", "alt") 
-	colnames(qtllst) <- qtl_col
+	base::colnames(qtllst) <- qtl_col
 
 	qtl_gb <- c("snps", "chr", "gene")
 
@@ -424,7 +420,7 @@ plt_dsg <- function(qtllst, pntp, gntp, gntp_ptn="*.dosage", gntp_zipped=TRUE,
 	
 	# Fetch phenotypes
 	if(is.data.frame(pntp)) {  # A dataframe with column as subjects, rows as measurements
-		pntp_rwnm <- rownames(pntp)
+		pntp_rwnm <- base::rownames(pntp)
 		use_pntp <- pntp[which(pntp_rwnm %in% use_msmnt), ]
 	} else {
 		stop("pntp should be a dataframe")
@@ -441,50 +437,57 @@ plt_dsg <- function(qtllst, pntp, gntp, gntp_ptn="*.dosage", gntp_zipped=TRUE,
 		gntp_dtfm <- data.frame()
 		for (flnm in flnmlst) {
 			gntp_file <- file.path(gntp, flnm)
-			tmp_dtfm <- pprcs(gntp_file, dscd=gntp_blck_lst, trps=FALSE, zipped=gntp_zipped)
+			tmp_dtfm <- pprcs(gntp_file, dscd=gntp_blck_lst, trps=FALSE)
 			gntp_dtfm <- rbind(gntp_dtfm, tmp_dtfm)
 		}
 	} else if(file_test("-f", gntp)) {
-		gntp_dtfm <- pprcs(gntp_file, dscd=gntp_blck_lst, trps=FALSE, zipped=gntp_zipped)
+		gntp_dtfm <- pprcs(gntp_file, dscd=gntp_blck_lst, trps=FALSE)
 	} else {
 		stop("gntp should be a directory, normal file, or zipped file")
 	}
-	gntp_rwnm <- rownames(gntp_dtfm)
+	gntp_rwnm <- base::rownames(gntp_dtfm)
 	use_gntp <- gntp_dtfm[which(gntp_rwnm %in% use_snps), ]
 
-	# Encode genotype
 	# print(rbind(use_gntp, use_pntp))
-
+	# Encode genotype
 	tmp_func <- function(x, use_gntp, use_pntp) {
 		snpid <- x[1]
 		msmnt <- x[2]
 		ref <- x[6]
 		alt <- x[7]
 		gntp_dsg <- use_gntp[snpid, ]
-		gntp_code <- sapply(gntp_dsg, function(d){
-							if(is.na(d)){ return(NA) }
-							else if(round(d) == 0){ return(paste0(ref, ref)) }
-							else if(round(d) == 1){ return(paste0(ref, alt)) }
-							else if(round(d) == 2){ return(paste0(alt, alt)) }
-							else { return(NA) } }
-						)
+		gntp_code <- sapply(gntp_dsg, function(d) {
+				if(length(d) != 1) { return(NA) }
+				if(round(d) == 0){ return(paste0(ref, ref)) }
+				else if(round(d) == 1){ return(paste0(ref, alt)) }
+				else if(round(d) == 2){ return(paste0(alt, alt)) }
+				else{ return(NA) }
+			}
+		)
 		pntp_msmnt <- use_pntp[msmnt, ]
 		gnpn <- rbind(pntp_msmnt, gntp_dsg, gntp_code)
-		rownames(gnpn) <- c(msmnt, snpid, "code")
+		base::rownames(gnpn) <- c(msmnt, snpid, "code")
 		return(gnpn)
 	}
-	gnpnlst <- apply(top_snps_per_chr, 1, tmp_func, use_gntp, use_pntp)
+
+	lgt <- dim(top_snps_per_chr)[1]
+	if(lgt != 0) {
+		gnpnlst <- apply(top_snps_per_chr, 1, tmp_func, use_gntp, use_pntp)
+	} else {
+		cat("[WARN]  top_snps_per_chr is empty. Exit ...\n")
+		return(NULL)
+	}
 
 	for(gnpn in gnpnlst) {
 		gnpn_t <- as.data.frame(t(gnpn))
 
-		col_names <- colnames(gnpn_t)
+		col_names <- base::colnames(gnpn_t)
 		lvl <- col_names[1]
 		snp <- col_names[2]
 		opt_flnm <- paste0(lvl, "_", snp, ".", svfmt)
 		opt_flnm <- file.path(opt_dir, opt_flnm)
 
-		colnames(gnpn_t) <- c("lvl", "dsg", "code")
+		base::colnames(gnpn_t) <- c("lvl", "dsg", "code")
 
 		gnpn_t["lvl"] <- as.numeric(gnpn_t[, "lvl"])
 		gnpn_t["dsg"] <- as.numeric(gnpn_t[, "dsg"])
@@ -529,18 +532,18 @@ prsarg <- function() {
 						 parser <- add_option(parser, c("-G", "--genotypes"), type="character", help="Genotypes file or directory")
 						 parser <- add_option(parser, c("-C", "--covariates"), type="character", help="Covariates")
 						 parser <- add_option(parser, c("-P", "--phenotypes"), type="character", help="Phenotypes file")
-						 parser <- add_option(parser, c("-S", "--config-file"), type="character", default="config.txt", help="File including settings, can be overrided by command arguments")
-						 parser <- add_option(parser, c("-T", "--tmp-dir"), type="character", default="qtl_mapping_tmp_dir", help="File including temporary files")
-						 parser <- add_option(parser, c("-o", "--output-dir"), type="character", default="qtl_mapping_output_dir", help="Output directory for the QTL mapping results")
+						 parser <- add_option(parser, c("-S", "--config-file"), type="character", default="config.cfg", help="File including settings, can be overrided by command arguments")
+						 parser <- add_option(parser, c("-T", "--tmp-dir"), type="character", default=NULL, help="File including temporary files")
+						 parser <- add_option(parser, c("-o", "--output-dir"), type="character", default=NULL, help="Output directory for the QTL mapping results")
 						 parser <- add_option(parser, c("-I", "--interactive"), type="store_true", help="Excute the script interactively")
-						 parser <- add_option(parser, c("", "--gntp_ptn"), type="character", default=NULL, help="Excute the script interactively")
+						 parser <- add_option(parser, c("", "--gntp_ptn"), type="character", default=NULL, help="Genptype files pattern")
 						 parser <- add_option(parser, c("", "--gntp_zip"), type="store_true", help="The genotype input file is zipped")
 
 						 agmnts <- parse_args(parser, positional_arguments=1, convert_hyphens_to_underscores=TRUE)
 
 						 subcmd <- agmnts$args
-						 subcmdlst <- c("cknmlt", "trfm", "qtlmp", "pstmp", "pltdsg")  # pprcs: preprocessing. qltmp: QTL mapping. pstmp: post QLT mapping
-						 if(!subcmd %in% subcmdlst) { stop("Unknown subcmd: ", subcmd, ". Options: [cknmlt, trfm, qtlmp, pstmp, pltdsg]\n") }
+						 subcmdlst <- c("cknmlt", "trfm", "qtlmp", "pltmht", "pltdsg")  # pprcs: preprocessing. qltmp: QTL mapping. pstmp: post QLT mapping
+						 if(!subcmd %in% subcmdlst) { stop("Unknown subcmd: ", subcmd, ". Options: [cknmlt, trfm, qtlmp, pltmht, pltdsg]\n") }
 
 						 return(agmnts)
 					 }, error=function(e) {
@@ -570,11 +573,6 @@ stwkspc <- function(tmp_dir=NULL, opt_dir=NULL, mode="0755") {
 		dir.create(file.path(opt_dir, "plots"), mode=mode)
 		dir.create(file.path(opt_dir, "reports"), mode=mode)
 	}
-}
-
-# Remove all temporary files
-cleanup <- function() {
-
 }
 
 
@@ -645,7 +643,7 @@ main <- function() {
 				ipt_tmp_file <- file.path(tmp_dir, "cknmlt_tmp_dtfm.csv")
 				if(file.exists(opt_tmp_file)) {
 					exp_dtfm <- pprcs(opt_tmp_file, trps=FALSE)
-					cat("[WARN]  Will overwrite existing", opt_tmp_file)
+					cat("[WARN]  Will overwrite existing", opt_tmp_file, "\n")
 				} else if (file.exists(ipt_tmp_file)) {
 					exp_dtfm <- pprcs(ipt_tmp_file, trps=FALSE)
 				} else {
@@ -654,6 +652,10 @@ main <- function() {
 
 				phntp_trfm_mthd <- optlst$phntp_trfm_mthd 
 				phntp_trfm_cols <- optlst$phntp_trfm_cols 
+				if(phntp_trfm_cols == "*") {
+					phntp_trfm_cols <- colnames(exp_dtfm) 
+					phntp_trfm_cols <- phntp_trfm_cols[which(!phntp_trfm_cols %in% c("id"))]
+				}
 				exp_dtfm <- trfm_nmlt(exp_dtfm, trfm_cols=phntp_trfm_cols, trfm_mthd=phntp_trfm_mthd)
 
 				## Check the normality of the transformed raw data
@@ -687,11 +689,10 @@ main <- function() {
 				cvrt_ipt <- optlst$covariates 
 				cvrt_idxCol <- optlst$cvrt_idxCol 
 				cvrt_dtfmTrp <- optlst$cvrt_dtfmTrp 
-				cvrt_blckRows <- optlst$cvrt_blckRows 
-				cvrt_dscdCols <- optlst$cvrt_dscdCols 
+				cvrt_blckRows <- hndl_mltp_opt(optlst$cvrt_blckRows)
+				cvrt_dscdCols <- hndl_mltp_opt(optlst$cvrt_dscdCols)
 
-				discard <- c("id", "numDaysFromJan2015", "smoking", "ssnlt_sin", "ssnlt_cos", "prcnt_mnct", "D4P_TC_LMI1", "D8P_TC_LMI1")
-				cvrt_dtfm <- pprcs(cvrt_ipt, dscd=discard, blck=glbl_blck_lst)
+				cvrt_dtfm <- pprcs(cvrt_ipt, dscd=cvrt_dscdCols, blck=glbl_blck_lst)
 
 				# QTL mapping
 				# gntp_drct <- file.path("~", "Documents", "projects", "200HIV", "inputs", "dosage", "200HIV_dosages")
@@ -723,7 +724,7 @@ main <- function() {
 				qtl_tmp_file <- file.path(tmp_dir, "qtlmp_tmp_file.csv")
 				fwrite(qtl_dtfm, qtl_tmp_file, showProgress=FALSE, verbose=FALSE) 
 				cat("[INFO]  Please check", qtl_tmp_file, " for QTL list.\n")
-			} else if(subcmd == "pstmp") {
+			} else if(subcmd == "pltmht") {
 
 				qtl_dtfm_flnm <- file.path(tmp_dir, "qtlmp_tmp_file.csv")
 				if(file.exists(qtl_dtfm_flnm)) {
@@ -731,7 +732,6 @@ main <- function() {
 				} else {
 					stop("Failed to find temporary file", qtl_dtfm_flnm)
 				}
-
 
 				# Manhattan plots
 				#	snp_ifmt <- file.path("~", "Documents", "projects", "200HIV", "inputs", "dosage", "200HIV_dosages", "variantInfo.gz")
@@ -778,7 +778,10 @@ main <- function() {
 				gntp_ipt <- optlst$genotypes 
 				gntp_ptn <- optlst$gntp_ptn 
 				qtl_col <- c("snps", "gene", "pvalue", "SequenceName", "Position", "EffectAllele", "AlternativeAllele")
-				plt_dsg(qtls_dtfm, exp_dtfm, gntp_ipt, qtl_col=qtl_col, pvt=5e-7, gntp_blck_lst=c("id", glbl_blck_lst))
+				plt_dsg(
+					qtls_dtfm, exp_dtfm, gntp_ipt, qtl_col=qtl_col, pvt=5e-8,
+					gntp_blck_lst=c("id", glbl_blck_lst), opt_dir=opt_plots_dir
+				)
 			} else {
 				cat("[]")
 			}
@@ -796,3 +799,181 @@ main <- function() {
 main()
 
 # /vim:ts=8:ft=R/
+
+# sub-command `chnmlt`
+cknmlt <- function() {
+	# Preprocessing on phenotypes
+	exp_dtfm <- pprcs(phntp_file, dscd=phntp_dscdCols, blck=glbl_blck_lst, trps=FALSE)
+
+	phntp_raw_nmltCk_flnm <- file.path(opt_plots_dir, optlst$phntp_raw_nmltCk_flnm)
+	chck_nmlt(exp_dtfm, hst_opt=phntp_raw_nmltCk_flnm)
+
+	# Save the preprocessed dataframe for the next step.
+	# NOTE: Please try to avoid using comma in each field, for the saperator is comman in .csv files
+	tmp_file <- file.path(tmp_dir, "cknmlt_tmp_dtfm.csv")
+	fwrite(exp_dtfm, tmp_file, showProgress=FALSE, verbose=FALSE) 
+	cat("[INFO]  Please check", phntp_raw_nmltCk_flnm, " for distribution of each measurement.\n")
+	cat("[INFO]  Please check", tmp_file, " for preprocessed input data.\n")
+}
+
+# sub-command `trfm`
+trfm <- function() {
+	# This step could be ran several times, therefore first check if there
+	# is an processed file by this step (file name trfm_tmp_dtfm.tsv), if
+	# not then go to check if there's a temporary file clled
+	# cknmlt_tmp_dtfm.csv.
+	# TODO: Perhaps an argument option to decide overlap the last proprecess or keep all
+	## Transform the raw data by specific method: log2, log10, inverse-rank
+	opt_tmp_file <- file.path(tmp_dir, "trfm_exotl_tmp.csv")
+	ipt_tmp_file <- file.path(tmp_dir, "cknmlt_tmp_dtfm.csv")
+	if(file.exists(opt_tmp_file)) {
+		exp_dtfm <- pprcs(opt_tmp_file, trps=FALSE)
+		cat("[WARN]  Will overwrite existing", opt_tmp_file, "\n")
+	} else if (file.exists(ipt_tmp_file)) {
+		exp_dtfm <- pprcs(ipt_tmp_file, trps=FALSE)
+	} else {
+		stop("Failed to find temporary file(cknmlt_tmp_dtfm.csv) from last step [cknmlt] or file(trfm_exotl_tmp.csv) from current step [trfm]")
+	}
+
+	phntp_trfm_mthd <- optlst$phntp_trfm_mthd 
+	phntp_trfm_cols <- optlst$phntp_trfm_cols 
+	if(phntp_trfm_cols == "*") {
+		phntp_trfm_cols <- colnames(exp_dtfm) 
+		phntp_trfm_cols <- phntp_trfm_cols[which(!phntp_trfm_cols %in% c("id"))]
+	}
+	exp_dtfm <- trfm_nmlt(exp_dtfm, trfm_cols=phntp_trfm_cols, trfm_mthd=phntp_trfm_mthd)
+
+	## Check the normality of the transformed raw data
+	phntp_trfm_nmltCk_flnm <- file.path(opt_plots_dir, optlst$phntp_trfm_nmltCk_flnm)
+	chck_nmlt(exp_dtfm, hst_opt=phntp_trfm_nmltCk_flnm)
+	cat("[INFO]  Please check", phntp_trfm_nmltCk_flnm, " for distribution of each measurement after transforming.\n")
+
+	## Check outliers of transformed data using PCA
+	phntp_trfm_otlCk_flnm <- file.path(opt_plots_dir, optlst$phntp_trfm_otlCk_flnm)
+	pltpca(exp_dtfm, phntp_trfm_otlCk_flnm, idcol="id")  # Check the outliers using PCA
+	cat("[INFO]  Please check", phntp_trfm_otlCk_flnm, " for PCA plots.\n")
+
+	## Exclude outliers using 3 or 4 times of sd
+	exp_dtfm <- prcs_otls(exp_dtfm, n_sd=4)
+	phntp_exotl_nmltCk_flnm <- file.path(opt_plots_dir, optlst$phntp_exotl_nmltCk_flnm)
+	chck_nmlt(exp_dtfm, hst_opt=phntp_exotl_nmltCk_flnm)
+	cat("[INFO]  Please check", phntp_exotl_nmltCk_flnm, " for distribution of each measurement after excluding outliers.\n")
+
+	fwrite(exp_dtfm, opt_tmp_file, showProgress=FALSE, verbose=FALSE) 
+	cat("[INFO]  Please check", opt_tmp_file, " for preprocessed input data.\n")
+}
+
+# sub-command `qtlmp`
+qtlmp <- function(optlst) {
+	phntp_ipt <- file.path(tmp_dir, "trfm_exotl_tmp.csv")
+	if(file.exists(phntp_ipt)) {
+		exp_dtfm <- pprcs(phntp_ipt, dscd=c("id"), trps=TRUE)
+	} else {
+		stop("Failed to find temporary file(trfm_exotl_tmp.csv) from last step [trfm]")
+	}
+
+	# Covariates
+	# cvrt_file <- file.path("~", "Documents", "projects", "200HIV", "inputs", "datasets", "metaData_pcntgMnct_ssnlt_CD4CD8TC_2019Mar20.csv")
+	cvrt_ipt <- optlst$covariates 
+	cvrt_idxCol <- optlst$cvrt_idxCol 
+	cvrt_dtfmTrp <- optlst$cvrt_dtfmTrp 
+	cvrt_blckRows <- hndl_mltp_opt(optlst$cvrt_blckRows)
+	cvrt_dscdCols <- hndl_mltp_opt(optlst$cvrt_dscdCols)
+
+	cvrt_dtfm <- pprcs(cvrt_ipt, dscd=cvrt_dscdCols, blck=glbl_blck_lst)
+
+	# QTL mapping
+	# gntp_drct <- file.path("~", "Documents", "projects", "200HIV", "inputs", "dosage", "200HIV_dosages")
+	gntp_ipt <- optlst$genotypes 
+	gntp_ptn <- optlst$gntp_ptn 
+	gntp_zip <- optlst$gntp_zip 
+	gntp_blck_rows <- optlst$gntp_blck_rows 
+	gntp_dscd_cols <- optlst$gntp_dscd_cols 
+
+	qtl_dtfm <- data.frame()
+	if(file_test("-d", gntp_ipt)) {
+		if(is.null(gntp_ptn)) { stop("When --genotypes is a directory, gntp_ptn shouldn't be NULL or empty") }
+
+		flnmlst <- list.files(gntp_ipt, pattern=gntp_ptn)
+		if(length(flnmlst) == 0) { stop("--genotypes is a directory, but NO file following pattern (", gntp_ptn, ")") }
+
+		for (flnm in flnmlst) {
+			gntp_file <- file.path(gntp_ipt, flnm)
+			gntp_dtfm <- pprcs(gntp_file, dscd=c("id", glbl_blck_lst), trps=FALSE, zipped=TRUE)
+			qtl_dtfm <- rbind(qtl_dtfm, mkme(exp_dtfm, gntp_dtfm, cvrt_dtfm)$all$eqtls)
+		}
+	} else if(file_test("-f", gntp_ipt)) {
+		gntp_dtfm <- pprcs(gntp_file, dscd=c("id", glbl_blck_lst), trps=FALSE, zipped=TRUE)
+		qtl_dtfm <- mkme(exp_dtfm, gntp_dtfm, cvrt_dtfm)$all$eqtls
+	} else {
+		stop("--genotypes should be a directory, normal file, or zipped file")
+	}
+
+	qtl_tmp_file <- file.path(tmp_dir, "qtlmp_tmp_file.csv")
+	fwrite(qtl_dtfm, qtl_tmp_file, showProgress=FALSE, verbose=FALSE) 
+	cat("[INFO]  Please check", qtl_tmp_file, " for QTL list.\n")
+}
+
+# sub-command `pltmht`
+pltmht <- function(optlst) {
+	qtl_dtfm_flnm <- file.path(tmp_dir, "qtlmp_tmp_file.csv")
+	if(file.exists(qtl_dtfm_flnm)) {
+		qtl_dtfm <- pprcs(qtl_dtfm_flnm, trps=FALSE, as_idx=NULL)
+	} else {
+		stop("Failed to find temporary file", qtl_dtfm_flnm)
+	}
+
+	# Manhattan plots
+	#	snp_ifmt <- file.path("~", "Documents", "projects", "200HIV", "inputs", "dosage", "200HIV_dosages", "variantInfo.gz")
+	gntp_ifmt_flnm <- optlst$gntp_ifmt_flnm 
+	gntp_ifmt_zip <- optlst$gntp_ifmt_zip 
+
+	qtls <- intsct_qtlmt_ifmt(qtl_dtfm, gntp_ifmt_flnm)
+
+	# Save some data to make life easy
+	fwrite(qtls, file.path(tmp_dir, "qtls_gntpInfo_tmp_file.csv"),
+		   row.names=FALSE, quote=FALSE, sep=",")
+
+	sbjcts <- unique(qtls$gene)
+
+	use_cols <- c("snps", "SequenceName", "Position", "pvalue")
+	opt_pval_thrld <- 5e-2
+
+	for(sbjct in sbjcts) {
+		sbjct_qtls <- qtls[which(qtls$gene == sbjct), ]
+
+		prfx <- file.path(opt_plots_dir, sbjct)
+		pltme(sbjct_qtls, otpt_prfx=prfx, use_cols=use_cols)
+
+		otpt_flnm <- file.path(opt_reports_dir, paste0(sbjct, ".tsv"))
+		sbjct_qtls <- sbjct_qtls[which(sbjct_qtls[, 'pvalue'] < opt_pval_thrld), ]
+		fwrite(sbjct_qtls, otpt_flnm, row.names=FALSE, quote=FALSE, sep="\t")
+	}
+}
+
+
+# sub-command `pltdsg`
+pltdsg <- function(optlst) {
+	# Dosage plots
+	exp_dtfm_flnm <- file.path(tmp_dir, "trfm_exotl_tmp.csv")
+	if(file.exists(exp_dtfm_flnm)) {
+		exp_dtfm <- pprcs(exp_dtfm_flnm, trps=TRUE, as_idx="id")
+	} else {
+		stop("Failed to find temporary file", exp_dtfm_flnm)
+	}
+
+	qtls_dtfm_flnm <- file.path(tmp_dir, "qtls_gntpInfo_tmp_file.csv")
+	if(file.exists(qtls_dtfm_flnm)) {
+		qtls_dtfm <- pprcs(qtls_dtfm_flnm, trps=FALSE, as_idx=NULL)
+	} else {
+		stop("Failed to find temporary file", exp_dtfm_flnm)
+	}
+
+	gntp_ipt <- optlst$genotypes 
+	gntp_ptn <- optlst$gntp_ptn 
+	qtl_col <- c("snps", "gene", "pvalue", "SequenceName", "Position", "EffectAllele", "AlternativeAllele")
+	plt_dsg(
+			qtls_dtfm, exp_dtfm, gntp_ipt, qtl_col=qtl_col, pvt=5e-8,
+			gntp_blck_lst=c("id", glbl_blck_lst), opt_dir=opt_plots_dir
+	)
+}
