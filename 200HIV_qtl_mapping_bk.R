@@ -1,17 +1,17 @@
 #!/usr/bin/env Rscript
-
-# @version: 0.0.1
-# @author: Zhenhua Zhang
-# @eamil: zhenhua.zhang217@gmail.com
-# @refer: qtl_mapping.R (Xiaojing Chu)
-# @date: 4th June, 2019
+###############################################################################
+## @version: 0.0.1
+## @author: Zhenhua Zhang
+## @eamil: zhenhua.zhang217@gmail.com
+## @refer: qtl_mapping.R (Xiaojing Chu)
+## @date: 4th June, 2019
+###############################################################################
 
 
 # TODO: 1. When doing inverse-rank transform, use mean to replace NA, which is
 #		dangerous. Need a better way to deal with NAs
 #       2. Make the script rescuable at broken-points with additional command
 #       arguments
-
 
 # NOTE: 1. Settings in config file will be overrided by command line arguments
 #       2. Some settings is only modifiable by configuration files
@@ -20,6 +20,8 @@
 # 		comman in .csv files
 
 
+# Used packages
+# TODO: 1. Add version. 2. Suppress warnings(??)
 library(qqman)
 library(dplyr)
 library(ggplot2)
@@ -30,15 +32,13 @@ library(reshape2)
 library(data.table)
 library(MatrixEQTL)
 
-rm(list=ls())
-
 
 # Processing the configuration file
 prcs_cfg <- function(iptfl) {
 	cfglst <- list()
 	cfgs <- paste(readLines(iptfl), sep="\n")
 	for(line in cfgs) {
-		if(!startsWith(line, "#") && !stri_isempty(line)){
+		if(!startsWith(line, "#") && !stri_isempty(line)) {
 			plst <- strsplit(line, "=")
 			if(length(plst) != 1) {
 				stop("[ERROR]  The length of plst should be 1")
@@ -59,52 +59,77 @@ smt_fread <- function(flnm, zipped=FALSE, data.table=FALSE, header=TRUE,
 	#	cat("[INFO]  Reading\n          ", flnm, "\n")
 	if(zipped) {
 		return(fread(cmd=paste0("zcat < ", flnm), data.table=data.table,
-					 header=header, stringsAsFactors=stringsAsFactors,
-					 verbose=verbose, showProgress=showProgress 
-			 ))
+					header=header, stringsAsFactors=stringsAsFactors,
+					verbose=verbose, showProgress=showProgress 
+					))
 	} else {
 		return(fread(flnm, data.table=data.table, header=header,
-					 stringsAsFactors=stringsAsFactors, verbose=verbose,
-					 showProgress=showProgress 
-			 ))
+					stringsAsFactors=stringsAsFactors, verbose=verbose,
+					showProgress=showProgress 
+					))
 	}
 }
 
-# Preprocess
-pprcs <- function(flnm, dscd_cols=NULL, dscd_rows=NULL, trps=TRUE, as_idx="id",
-				  zipped=FALSE) {
-	cat("[INFO]  Processing\n          ", flnm, "\n")
+
+################################################################################  
+##    Preprocess                                                              ##
+################################################################################  
+pprcs <- function(flnm, dscd_cols=NULL, dscd_rows=NULL, kept_cols=NULL,
+				  kept_rows=NULL, trps=TRUE, as_idx="id", zipped=FALSE) {
+	cat("[INFO]  Processing: ", flnm, "\n")
 
 	dtfm <- smt_fread(flnm, zipped=zipped)
 
-	if(!is.null(as_idx)){ base::row.names(dtfm) <- dtfm[, as_idx] }
+	if(!is.null(as_idx)){
+		base::row.names(dtfm) <- dtfm[, as_idx] 
+	}
 
 	col_names <- base::colnames(dtfm)
 	row_names <- base::rownames(dtfm)
-	dtfm <- dtfm[, sort(col_names)]
+
+	dtfm <- dtfm[, base::sort(col_names)]
 	col_names <- base::colnames(dtfm)
 
 	if (is.null(dscd)) {
-		cat("[INFO]  Discarding list is empty ...\n")
+		cat("[INFO]  Columns discarding list is empty ...\n")
 	} else {
-		cat("[WARN]  Will discard column(s)\n          ", dscd, "...\n")
-		kept_cols <- col_names[which( !col_names %in% dscd)]
+		if(is.null(kept_cols)) {
+			cat("[INFO]  Columns keeping list is empty ...")
+		} else {
+			ovlps <- dscd_cols[which(dscd_cols %in% kept_cols)]
+			if(is.null(ovlp) || length(ovlp)!=0) {
+				stop("Overlap between dscd_cols and kept_cols: ", ovlps)
+			}
+		}
+		cat("[WARN]  Will discard column(s):", dscd, "...\n")
+		kept_cols <- c(kept_cols, col_names[which(!col_names %in% dscd_rows)])
 		dtfm <- dtfm[, kept_cols]
 	}
 
 	if (is.null(blck)) {
-		cat("[INFO]  Black list is empty ...\n")
+		cat("[INFO]  Row discarding list is empty ...\n")
 	} else {
-		cat("[WARN]  Will black-out rows(s)\n          ", blck, "...\n")
-		kept_rows <- row_names[which(!row_names %in% blck)]
+		if(is.null(kept_rows)) {
+			cat("[INFO]  Rows keeping list is empty ...")
+		} else {
+			ovlps <- dscd_cols[which(dscd_rows %in% kept_rows)]
+			if(is.null(ovlp) || length(ovlp)!=0) {
+				stop("Overlap between dscd_rows and kept_rows: ", ovlps)
+			}
+		}
+		cat("[WARN]  Will discard rows(s):", blck, "...\n")
+		kept_rows <- c(kept_rows, col_names[which(!row_names %in% dscd_rows)])
 		dtfm <- dtfm[kept_rows, ]
 	}
 
-	# dtfm <- dtfm[, !(base::colnames(dtfm) %in% c(as_idx))]
 
 	if(trps) {
-		cat("[WARN]  Will transpose dataframe: dtfm\n")
-		return(as.data.frame(t(dtfm), stringsAsFactors=FALSE))
+		cat("[WARN]  Will transpose dataframe taking", as_idx, "as character\n")
+		idx_val <- dtfm[, as_idx]
+		dtfm <- dtfm[, !(base::colnames(dtfm) %in% c(as_idx))]
+		dtfm <- as.data.frame(t(dtfm), stringsAsFactors=FALSE)
+		dtfm[as_idx, ] <- idx_val
+		return(dtfm)
 	} else {
 		return(dtfm)
 	}
@@ -112,16 +137,21 @@ pprcs <- function(flnm, dscd_cols=NULL, dscd_rows=NULL, trps=TRUE, as_idx="id",
 
 
 ###############################################################################
-##       Check the normality of each measuements                             ##
+##    Check the normality of each measuements                                ##
 ###############################################################################
-chck_nmlt <- function(dtfm, hst_opt="Normality_check.pdf", bins=30) {
+chck_nmlt <- function(dtfm, hst_opt="Normality_check.pdf", bins=30, idv='id',
+					  stclnm=TRUE, fgsz=3) {
 	cat("[INFO]  Check the normality...\n")
 
-	if(!is.data.frame(dtfm)) { stop("[ERROR]  `dtfm` should be a dataframe ...") }
+	if(!is.data.frame(dtfm)) {
+		stop(" `dtfm` should be a dataframe ...")
+	}
 
-	col_names <- sort(base::colnames(dtfm))
-	dtfm <- dtfm[col_names]
-	exp_mlt <- reshape2::melt(dtfm, id.vars='id')
+	if(stclnm) {
+		dtfm <- dtfm[, base::sort(base::colnames(dtfm))]
+	}
+
+	exp_mlt <- reshape2::melt(dtfm, id.vars=idv)
 
 	nvars <- length(unique(exp_mlt["variable"])[[1]])
 	ncol <- as.integer(sqrt(nvars))
@@ -130,12 +160,12 @@ chck_nmlt <- function(dtfm, hst_opt="Normality_check.pdf", bins=30) {
 	p <- p + geom_histogram(aes(x=value), na.rm=TRUE, bins=bins)
 	p <- p + facet_wrap(.~variable, ncol=ncol, scales="free")
 
-	ggsave(hst_opt, width=ncol*3, height=ncol*3)
+	ggsave(hst_opt, width=ncol*fgsz, height=ncol*fgsz)
 }
 
 
 ###############################################################################
-##       Transform                                                           ##
+##    Transform                                                              ##
 ###############################################################################
 # Inverse rank normalization
 ivsrk <- function(x, lude.mode=TRUE){
@@ -156,8 +186,11 @@ ivsrk <- function(x, lude.mode=TRUE){
 	return(res)
 }
 
+
 # Trans form log10 values into log2 values
 lg10tolg2 <- function(x) { return(x * log2(10)) }
+
+# Trans form log2 values into log10 values
 lg2tolg10 <- function(x) { return(x * log10(2)) }
 
 
@@ -165,26 +198,29 @@ lg2tolg10 <- function(x) { return(x * log10(2)) }
 #       otherwise, the transpose would fail
 # Transform non-normal distributed phnotype column into
 trfm_nmlt <- function(dtfm, dscd_cols=NULL, trfm_cols=NULL, trfm_mthd="log2",
-					  trps=FALSE, idcol="id") {
+					  trps=FALSE, idcol="id", stclnm=TRUE) {
 	cat("[INFO]  Transform data by", trfm_mthd, "\n")
-	row_names <- base::rownames(dtfm)
+
+	id_val <- dtfm[idcol]
 	dtfm[idcol] <- NULL
-	col_names <- sort(base::colnames(dtfm))
-	dtfm <- dtfm[col_names]
+
+	row_names <- base::rownames(dtfm)
+	if(stclnm) {
+		dtfm <- dtfm[base::sort(base::colnames(dtfm))]
+	}
+	col_names <- colnames(dtfm)
 
 	if(!is.null(dscd_cols)) {
 		cat("[WARN]  Will discard: \n         ", dscd_cols, "\n")
-		dscd_idx <- which(col_names %in% dscd_cols)
-		dtfm <- dtfm[, -dscd_idx]
+		dtfm <- dtfm[, which(!col_names %in% dscd_cols)]
 		col_names <- base::colnames(dtfm)
 	}
 
 	if(!is.null(trfm_cols) && !is.na(trfm_cols)) {
 		if(!is.null(dscd_cols)){
-			ovlp_cols <- trfm_cols[which(dscd_cols %in% trfm_cols)]
-			if(length(ovlp_cols) != 0) {
-				stop("[ERROR]  Overlapped between dscd_cols and trfm_cols \n",
-					 ovlp_cols)
+			ovlp <- trfm_cols[which(dscd_cols %in% trfm_cols)]
+			if(length(ovlp) != 0) {
+				stop("Overlapped between dscd_cols and trfm_cols \n", ovlp)
 			}
 		}
 
@@ -197,27 +233,33 @@ trfm_nmlt <- function(dtfm, dscd_cols=NULL, trfm_cols=NULL, trfm_mthd="log2",
 		} else {
 			dtfm[, trfm_cols] <- sapply(dtfm[, trfm_cols], trfm_mthd)
 		}
+
 		base::colnames(dtfm) <- sapply(col_names, 
-			function(x) {ifelse(x%in%trfm_cols, paste(x, trfm_mthd, sep="_"), x)}
+			function(x) {
+				if(x %in% trfm_cols) {return(paste(x, trfm_mthd, sep="_"))}
+				else {return(x)}
+			}
 		)
 	} else {
 		cat("[WARN]  trfm_cols is either NULL or NA\n")
 	}
 
 	if(trps) {
-		cat("[INFO]  Will transpose dataframe: dtfm \n")
-		dtfm <- t(dtfm)
+		cat("[WARN]  Will transpose dataframe taking", idcol, "as character\n")
+		dtfm <- as.data.frame(t(dtfm), stringsAsFactors=FALSE)
 	}
 
 	dtfm <- as.data.frame(scale(dtfm), stringsAsFactors=FALSE)
-	dtfm[idcol] <- row_names
+	dtfm[idcol] <- id_val
 	return(dtfm)
 }
 
 
 # Draw PCA
-pltpca <- function(dtfm, opt_flnm="Outlier_check_PCA.pdf", idcol="id") {
+plt_pca <- function(dtfm, opt_flnm="Outlier_check_PCA.pdf", idcol="id",
+				   fgwd=10, fght=10, fgunt="in") {
 	cat("[INFO]  Plotting PCA... \n")
+
 	if(!is.data.frame(dtfm)) {
 		stop("[ERROR]  `dtfm` should be a dataframe ...")
 	}
@@ -225,50 +267,56 @@ pltpca <- function(dtfm, opt_flnm="Outlier_check_PCA.pdf", idcol="id") {
 	dtfm[idcol] <- NULL
 	dtfm[is.na(dtfm)] <- mean(base::rowMeans(dtfm), na.rm=TRUE)
 	pca <- prcomp(dtfm)
-	pcax <- pca$x
+	pcax <- as.data.frame(pca$x, stringsAsFactors=FALSE)
 	pcac <- pca$center
 
 	p <- ggplot() + theme_bw()
-	p <- p + geom_point(data=as.data.frame(pcax, stringsAsFactors=FALSE), mapping=aes(x=PC1, y=PC2))
+	p <- p + geom_point(data=pcax, mapping=aes(x=PC1, y=PC2))
 
-	ggsave(opt_flnm, width=10, height=10, units="in")
+	ggsave(opt_flnm, width=fgwd, height=fght, units=fgunt)
 }
 
 
-# A PCA analysis to remove outliers (out of 3*sd or 4*sd)
+# Remove outliers (out of 3*sd or 4*sd)
 prcs_otls <- function(dtfm, n_sd=3, trps=FALSE, idcol="id") {
 	cat("[INFO]  Removing outliers...\n")
-	row_names <- base::rownames(dtfm)
-	dtfm[idcol] <- NULL
 
-	masked <- sapply(dtfm,
-									 function(x) {
-										 sd=sd(x, na.rm=TRUE)
-										 mu=mean(x, na.rm=TRUE)
-										 flt <- which((x<=mu-n_sd*sd) | (x>=mu+n_sd*sd))
-										 x[flt] <- NA
-										 return(x)
-									 })
-
-	masked <- as.data.frame(masked, row.names=row_names, stringsAsFactors=FALSE)
-	cat("[INFO]  Number of masked subjects in each measurments:\n")
-	nacnt <- sapply(masked, function(x) {sum(is.na(x))})
-
-	col_names <- base::colnames(masked)
-	masked[idcol] <- row_names
-	masked <- masked[c(idcol, col_names)]
-
-	if(trps) {
-		cat("[INFO]  Will transpose dataframe: masked\n")
-		return(t(masked))
-	} else {
-		return(masked) 
+	if(!is.null(idcol)) {
+		id_val <- dtfm[idcol]
+		dtfm[idcol] <- NULL
 	}
+
+	row_names <- base::rownames(dtfm)
+	col_names <- base::colnames(dtfm)
+
+	dtfm <- sapply(dtfm,
+		function(x) {
+			sd <- sd(x, na.rm=TRUE)
+			mu <- mean(x, na.rm=TRUE)
+			x[which((x <= mu - n_sd * sd) | (x >= mu + n_sd * sd))] <- NA
+			return(x)
+		}
+	)
+
+	dtfm <- as.data.frame(dtfm, row.names=row_names, stringsAsFactors=FALSE)
+	cat("[INFO]  Number of masked subjects in each measurments:\n")
+	nacnt <- sapply(dtfm, function(x) {sum(is.na(x))})
+
+	col_names <- base::colnames(dtfm)
+	if(trps) {
+		cat("[WARN]  Will transpose dataframe taking", idcol, "as character\n")
+		dtfm <- as.data.frame(t(dtfm), stringsAsFactors=FALSE)
+	}
+
+	dtfm[idcol] <- id_val
+	dtfm <- dtfm[c(idcol, col_names)]
+	return(dtfm)
 }
 
 
-crt_slcdt <- function(ipt, dlmt=",", omchr="NA", skprw=0, skpcl=0,
-											slice_size=2000) {
+# Create SliceDate object
+mkslcdt <- function(ipt, dlmt=",", omchr="NA", skprw=0, skpcl=0,
+					slice_size=2000) {
 	#	cat("[INFO]  Creating SlicedData ...\n")
 	slcdt <- SlicedData$new()
 	slcdt$fileDelimiter <- dlmt
@@ -298,9 +346,9 @@ mkme <- function(pntp, gntp, cvrt=NULL, opt_file=NULL, pv_opt_thr=5e-2) {
 	errorCovariance <- numeric()
 	print(cvrt[1:5, 1:5])
 
-	gene <- crt_slcdt(pntp)
-	snps <- crt_slcdt(gntp, dlmt="\t")
-	cvrt <- crt_slcdt(cvrt)
+	gene <- mkslcdt(pntp)
+	snps <- mkslcdt(gntp, dlmt="\t")
+	cvrt <- mkslcdt(cvrt)
 
 	me <- Matrix_eQTL_engine(
 		 snps=snps, gene=gene, cvrt=cvrt,
@@ -389,8 +437,6 @@ ckmd <- function(dtfm, thrshld=0.5) {
 
 
 # Draw dosage boxplot
-# use_col should be as the following order: 
-# TRY NOT BE COMPLICATED
 plt_dsg <- function(qtl_dtfm, pntp, gntp, gntp_ptn="*.dosage", gntp_zipped=TRUE,
 					svfmt="pdf", pvt=5e-8, qtl_col=NULL, gntp_blck_lst=NULL,
 					opt_dir="qtl_mapping_output_dir/plots") {
@@ -524,36 +570,60 @@ hndl_mltp_opt <- function(arg) {
 		return(arg)
 	}
 }
+
+
 # Parsing command line arguments
-# parser <- add_option(parser, c("-", "--"), type="character", default="", help="")
-# TODO: -g is only for --gui ??
 prsarg <- function() {
 	tryCatch(
-					 {
-						 parser <- OptionParser()
+		{
+			parser <- OptionParser()
 
-						 parser <- add_option(parser, c("-G", "--genotypes"), type="character", help="Genotypes file or directory")
-						 parser <- add_option(parser, c("-C", "--covariates"), type="character", help="Covariates")
-						 parser <- add_option(parser, c("-P", "--phenotypes"), type="character", help="Phenotypes file")
-						 parser <- add_option(parser, c("-S", "--config-file"), type="character", default="config.cfg", help="File including settings, can be overrided by command arguments")
-						 parser <- add_option(parser, c("-T", "--tmp-dir"), type="character", default=NULL, help="File including temporary files")
-						 parser <- add_option(parser, c("-o", "--output-dir"), type="character", default=NULL, help="Output directory for the QTL mapping results")
-						 parser <- add_option(parser, c("-I", "--interactive"), type="store_true", help="Excute the script interactively")
-						 parser <- add_option(parser, c("", "--gntp_ptn"), type="character", default=NULL, help="Genptype files pattern")
-						 parser <- add_option(parser, c("", "--gntp_zip"), type="store_true", help="The genotype input file is zipped")
+			parser <- add_option(
+				parser, c("-G", "--genotypes"), type="character",
+				help="Genotypes file or directory"
+			)
+			parser <- add_option(
+				parser, c("-C", "--covariates"), type="character",
+				help="Covariates"
+			)
+			parser <- add_option(
+				parser, c("-P", "--phenotypes"), type="character",
+				help="Phenotypes file"
+			)
+			parser <- add_option(
+				parser, c("-S", "--config-file"), type="character",
+				default="config.cfg",
+				help="File including settings, overrided by command arguments"
+			)
+			parser <- add_option(
+				parser, c("-T", "--tmp-dir"), type="character",
+				help="File for temporary files"
+			)
+			parser <- add_option(
+				parser, c("-o", "--output-dir"), type="character",
+				help="Output directory for the QTL mapping results"
+			)
+			agmnts <- parse_args(
+				parser, positional_arguments=1,
+				convert_hyphens_to_underscores=TRUE
+			)
 
-						 agmnts <- parse_args(parser, positional_arguments=1, convert_hyphens_to_underscores=TRUE)
+			subcmd <- agmnts$args
 
-						 subcmd <- agmnts$args
-						 subcmdlst <- c("cknmlt", "trfm", "qtlmp", "qtlrpt", "pltdsg")  # pprcs: preprocessing. qltmp: QTL mapping. pstmp: post QLT mapping
-						 if(!subcmd %in% subcmdlst) { stop("Unknown subcmd: ", subcmd, ". Options: [cknmlt, trfm, qtlmp, qtlrpt, pltdsg]\n") }
-
-						 return(agmnts)
-					 }, error=function(e) {
-						 cat("[ERROR] ", e$message, "\n")
-					 }, finally=function(msg) {
-						 cat("[INFO]  Finished tryCatch scope", msg, "\n")
-					 }
+			# cknmlt: check normality
+			# trfm: Transfomr data
+			# qltmp: QTL mapping
+			# qtlrpt: produce QTL report
+			subcmdlst <- c("cknmlt", "trfm", "qtlmp", "qtlrpt")
+			if(!subcmd %in% subcmdlst) {
+				stop("Unknown: ", subcmd, "Opts: cknmlt, trfm, qtlmp, qtlrpt")
+			}
+		}, error=function(e) {
+			cat("[ERROR] ", e$message, "\n")
+		}, finally=function(msg) {
+			cat("[INFO]  Finished tryCatch scope", msg, "\n")
+			return(agmnts)
+		}
 	)
 }
 
@@ -595,13 +665,14 @@ stwkspc <- function(tmp_dir=NULL, opt_dir=NULL, mode="0755") {
 
 # Merge the settings from configuration file and command line arguments
 mgcfgcmd <- function(agmntlst, cfglst) {
-	if(!is.list(agmntlst) || !is.list(cfglst)) { stop("Keyword arguments both agmntlst and cfglst should be list") }
+	if(!is.list(agmntlst) || !is.list(cfglst)) {
+		stop("Keyword arguments both agmntlst and cfglst should be list")
+	}
 	cmdopts <- agmntlst$options
 	cmdopts["subcmd"] <- agmntlst$args
 	cfglst[names(cmdopts)] <- cmdopts
 	return(cfglst)
 }
-
 
 
 # sub-command `chnmlt`
@@ -623,12 +694,12 @@ cknmlt <- function(optlst) {
 		optlst$opt_pprc_dir, optlst$pntp_raw_nmltCk_flnm
 	)
 	chck_nmlt(pntp_dtfm, hst_opt=pntp_raw_nmltCk_flnm)
-	cat("[INFO]  Check", pntp_raw_nmltCk_flnm, " for distributions.\n")
+	cat("[INFO]  Check", pntp_raw_nmltCk_flnm, "for distributions.\n")
 
 	# Save the preprocessed dataframe for the next step.
 	cknmlt_tmp_dtfm <- file.path(tmp_dir, "cknmlt_tmp.csv")
 	fwrite(pntp_dtfm, tmp_file, showProgress=FALSE, verbose=FALSE) 
-	cat("[INFO]  Check", cknmlt_tmp_dtfm, " for preprocessed input data.\n")
+	cat("[INFO]  Check", cknmlt_tmp_dtfm, "for preprocessed input data.\n")
 }
 
 
@@ -670,15 +741,15 @@ trfm <- function() {
 	chck_nmlt(pntp_dtfm, hst_opt=pntp_trfm_nmltCk_flnm)
 	cat(
 		"[INFO]  Check", pntp_trfm_nmltCk_flnm,
-		" for distributions after transforming.\n"
+		"for distributions after transforming.\n"
 	)
 
 	## Check outliers of transformed data using PCA
 	pntp_trfm_otlCk_flnm <- file.path(
 		optlst$opt_pprc_dir, optlst$pntp_trfm_otlCk_flnm
 	)
-	pltpca(pntp_dtfm, pntp_trfm_otlCk_flnm, idcol="id")  
-	cat("[INFO]  Check", pntp_trfm_otlCk_flnm, " for PCA plots.\n")
+	plt_pca(pntp_dtfm, pntp_trfm_otlCk_flnm, idcol="id")  
+	cat("[INFO]  Check", pntp_trfm_otlCk_flnm, "for PCA plots.\n")
 
 	## Exclude outliers using 3 or 4 times of sd
 	pntp_otl_n_sd <- as.numeric(optlst$pntp_otl_n_sd)
@@ -691,11 +762,11 @@ trfm <- function() {
 	chck_nmlt(pntp_dtfm, hst_opt=pntp_exotl_nmltCk_flnm)
 	cat(
 		"[INFO]  Check", pntp_exotl_nmltCk_flnm,
-		" for distributions after excluding outliers.\n"
+		"for distributions after excluding outliers.\n"
 	)
 
 	## Save processed data frame into temporary file
-	opt_tmp_file <- file.path(optlst$tmp_dir, "trfm_exotl_tmp.csv")
+	opt_tmp_file <- file.path(optlst$tmp_dir, "trfm_tmp.csv")
 	fwrite(pntp_dtfm, opt_tmp_file, showProgress=FALSE, verbose=FALSE) 
 	cat("[INFO]  Check", opt_tmp_file, " for preprocessed input data.\n")
 }
@@ -707,11 +778,11 @@ qtlmp <- function(optlst) {
 	opt_dir <- optlst$opt_dir
 	glbl_blck_lst <- optlst$glbl_blck_lst
 
-	ipt_tmp_flnm <- file.path(tmp_dir, "trfm_exotl_tmp.csv")
+	ipt_tmp_flnm <- file.path(tmp_dir, "trfm_tmp.csv")
 	if(file.exists(ipt_tmp_flnm)) {
 		pntp_dtfm <- pprcs(ipt_tmp_flnm, dscd_cols=c("id"), trps=TRUE)
 	} else {
-		stop("NOT FOUND temp-file(trfm_exotl_tmp.csv) of last step [trfm]")
+		stop("NOT FOUND temp-file(trfm_tmp.csv) of last step [trfm]")
 	}
 
 	# Covariates
@@ -771,6 +842,7 @@ qtlmp <- function(optlst) {
 	cat("[INFO]  Please check", opt_tmp_file, " for QTL list.\n")
 }
 
+
 # sub-command `qtlrpt`
 qtlrpt <- function(optlst) {
 	tmp_dir <- optlst$tmp_dir
@@ -804,18 +876,19 @@ qtlrpt <- function(optlst) {
 
 		opt_prfx <- file.path(opt_mhtn_dir, msmnt)
 		plt_mht(msmnt_dtfm, opt_prfx=opt_prfx, use_cols=qtlrpt_mhtnplt_cols)
-		cat("[INFO] Check ", opt_prfx, "for Manhattan plot\n")
+		cat("[INFO] Check", paste0(opt_prfx, opt_prfx), "for Manhattan plot\n")
 
-		opt_flnm <- file.path(optlst$opt_reports_dir, paste0(msmnt, ".csv"))
+		opt_flnm <- file.path(optlst$opt_qtl_dir, paste0(msmnt, ".csv"))
 		msmnt_dtfm <- msmnt_dtfm[which(msmnt_dtfm[pvalue] < qtlrpt_opt_pvt), ]
 		fwrite(msmnt_dtfm, opt_flnm, row.names=FALSE, quote=FALSE, sep=",")
-		cat("[INFO] Check ", "\n")
+		cat("[INFO] Check", opt_flnm, "for QTL informations\n")
 	}
 
-	#  Plog genotype level for top SNPs
+	#  Plot genotype level for top SNPs
 	## Read temp-files
 	pntp_idx_col <- optlst$pntp_idx_col
-	ipt_pntp_flnm <- file.path(tmp_dir, "trfm_exotl_tmp.csv")
+	ipt_pntp_flnm <- file.path(tmp_dir, "trfm_tmp.csv")
+
 	if(file.exists(ipt_pntp_flnm)) {
 		pntp_dtfm <- pprcs(ipt_pntp_flnm, trps=TRUE, as_idx=pntp_idx_col)
 	} else {
@@ -826,7 +899,6 @@ qtlrpt <- function(optlst) {
 	gntp_ptn <- optlst$gntp_ptn 
 	gntp_zip <- optlst$gntp_zip
 	gntp_dscd_cols <- c(hndl_mltp_opt(optlst$gntp_dscd_cols), glbl_blck_lst)
-
 	qtlrpt_dsgplt_pvt <- as.numeric(optlst$qtlrpt_dsgplt_pvt)
 	qtlrpt_dsgplt_cols <- hndl_mltp_opt(optlst$qtlrpt_dsgplt_cols)
 
@@ -838,10 +910,10 @@ qtlrpt <- function(optlst) {
 }
 
 
-
 # Create a README.md file to descript current
-mkrdm <- function() {
+mkrdme <- function() {
 }
+
 
 # Main function
 main <- function() {
@@ -853,6 +925,14 @@ main <- function() {
 			opts <- agmntlst$options
 			cfglst <- prcs_cfg(opts$config_file)
 			optlst <- mgcfgcmd(agmntlst, cfglst)
+
+			# Err files
+			errobj <- file(file.path(opt_lg_dir, paste0(subcmd, ".err")))
+			sink(errobj, append=TRUE, type="message")
+
+			# Log files
+			logobj <- file(file.path(opt_lg_dir, paste0(subcmd, ".log")))
+			sink(logobj, append=TRUE, type="output")
 
 			tmp_dir <- optlst$tmp_dir
 			opt_dir <- optlst$opt_dir
@@ -866,14 +946,8 @@ main <- function() {
 			optlst$opt_mhtn_dir <- file.path(opt_rpt_dir, "ManhattanPlot")
 			optlst$opt_pprc_dir <- file.path(opt_rpt_dir, "Preprocessing")
 
-			# Positional argument
+			# Sub-command
 			subcmd <- optlst$subcmd
-
-			# Error files
-			# sink(file(file.path(opt_lg_dir, paste0(subcmd, ".err"))), append=TRUE, type="message")
-
-			# Log files
-			# sink(file(file.path(opt_lg_dir, paste0(subcmd, ".log"))), append=TRUE, type="output")
 
 			# Global black list
 			optlst$glbl_blck_lst <- hndl_mltp_opt(optlst$glbl_blck_lst)
@@ -888,19 +962,16 @@ main <- function() {
 			} else if(subcmd == "qtlrpt") {
 				qtlrpt(optlst)
 			} else {
-				stop("[ERROR]  Unknow error while processing sub-command")
+				stop("Unknow error while processing sub-command: ", subcmd)
 			}
 		}, error=function(e) {
 			cat("[ERROR]  ", e$message, "\n")
 			print(e)
-			cat("[WARN]  NO cleaning-up ...\n")
 		}, finally=function(m) {
-			cat("[INFO]  Success!! \n")
+			cat("[INFO]  Success!!!\n\n------------------------------------")
 		}
 	)
 }
 
 main()
-
-# /vim:ts=8:ft=R/
 
