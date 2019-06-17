@@ -422,11 +422,14 @@ plt_mht <- function(qtls_lst, use_cols=NULL, opt_prfx="qtl_mapping",
 # Filter out check the number of mode
 ckmd <- function(dtfm, thrshld=0.5) {
 	if(is.data.frame(dtfm)) {
-		return(sapply(dtfm, 
-									function(x) {
-										cnt <- table(x)
-										ifelse(max(cnt)/sum(cnt) >= thrshld, TRUE, FALSE)
-									}))
+		res <- sapply(dtfm, 
+			function(x) {
+				cnt <- table(x)
+				blvct <- ifelse(max(cnt)/sum(cnt) >= thrshld, TRUE, FALSE)
+				return(blvct)
+			}
+		)
+		return(res)
 	} else if (is.vector(dtfm)) {
 		cnt <- table(dtfm)
 		return(ifelse(max(cnt)/sum(cnt) >= thrshld, TRUE, FALSE))
