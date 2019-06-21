@@ -205,14 +205,19 @@ Discarded subjects
 	- age
 	- gender
 	- BMI (remove)
-	- Smoking(packYears, remove)
+	- packYears (smoking, remove)
+	- smoking (binary)
+	- numDaysFromJan2015 (linear time)
+	- ssnlt_sin (seasonality sin part, sin(2*pi*numDaysFromJan2015/365))
+	- ssnlt_cos (seasonality cos part, cos(2*pi*numDaysFromJan2015/365))
+	- prcnt_mnct (percentage of monocytes, cell counts)
+	- D4P_TC_LMI1 (D4+ T cell, cell counts)
+	- D8P_TC_LMI1 (D8+ T cell, cell counts)
 
   - Need to be added
 	- % monocytes (200HIV50FG_SysmexPBMC_curated20190227.csv)
-	- seasonality (sin(2*pi*numDaysFromJan2015/365)+cos(2*pi*numDaysFromJan2015/365))
 
   - Unknown source
-	- CD4_NADIR
 	- HIV_DURATION
 
 

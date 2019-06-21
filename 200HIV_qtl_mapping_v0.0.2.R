@@ -23,16 +23,15 @@
 # Used packages
 # TODO: 1. Add version
 # library(methods)
-options(warn=-1) # Suppress warnings
 library(qqman)
 library(dplyr)
 library(ggplot2)
+library(methods)
 library(stringi)
 library(optparse)
 library(reshape2)
 library(data.table)
 library(MatrixEQTL)
-options(warn=0) # Suppress warnings
 
 
 # Processing the configuration file
@@ -90,41 +89,25 @@ pprcs <- function(flnm, dscd_cols=NULL, dscd_rows=NULL, kept_cols=NULL,
   col_names <- base::colnames(dtfm)
   dtfm <- dtfm[, base::sort(col_names)]
   col_names <- base::colnames(dtfm)
-
-  if (is.null(dscd_cols)) {
-    cat("[INFO]  Columns discarding list is empty ...\n")
-  } else {
-    if(is.null(kept_cols)) {
-      cat("[INFO]  Columns keeping list is empty ...\n")
-    } else {
-      ovlps <- dscd_cols[which(dscd_cols %in% kept_cols)]
-      if(is.null(ovlp) || length(ovlp)!=0) {
-        stop("Overlap between dscd_cols and kept_cols: ", ovlps)
-      }
-    }
-    cat("[WARN]  Will discard column(s): ", dscd_cols, "\n")
-    kept_cols <- c(kept_cols, col_names[which(!col_names %in% dscd_cols)])
-	cat("[INFO]  Kept columns: ", head(kept_cols, n=swhd), "\n")
-    dtfm <- dtfm[, kept_cols]
-  }
+  
+  if(is.null(kept_cols)) {
+	kept_cols <- col_names[which(!col_names %in% dscd_cols)]
+  } 
+  cat(
+    "[INFO]  Kept cols(first", swhd, "of", length(kept_cols), "): ",
+    head(kept_cols, n=swhd), "\n"
+  )
+  dtfm <- dtfm[, kept_cols]
 
   row_names <- base::rownames(dtfm)
-  if (is.null(dscd_rows)) {
-    cat("[INFO]  Row discarding list is empty ...\n")
-  } else {
-    if(is.null(kept_rows)) {
-      cat("[INFO]  Rows keeping list is empty ...\n")
-    } else {
-      ovlps <- dscd_rows[which(dscd_rows %in% kept_rows)]
-      if(is.null(ovlp) || length(ovlp)!=0) {
-        stop("Overlap between dscd_rows and kept_rows: ", ovlps)
-      }
-    }
-    cat("[WARN]  Will discard rows(s): ", dscd_rows, "\n")
-    kept_rows <- c(kept_rows, row_names[which(!row_names %in% dscd_rows)])
-	cat("[INFO]  Kept rows: ", head(kept_rows, n=swhd), "\n")
-    dtfm <- dtfm[kept_rows, ]
+  if(is.null(kept_rows)) {
+	kept_rows <- row_names[which(!row_names %in% dscd_rows)]
   }
+  cat(
+    "[INFO]  Kept rows(first", swhd, "of", length(kept_rows), "): ",
+    head(kept_rows, n=swhd), "\n"
+  )
+  dtfm <- dtfm[kept_rows, ]
 
   if(trps) {
     if(!is.null(as_idx)) {
@@ -819,11 +802,14 @@ qtlmp <- function(optlst) {
   cvrt_dscd_idx <- as.logical(optlst$cvrt_dscd_idx)
   cvrt_dtfm_trp <- as.logical(optlst$cvrt_dtfm_trp)
   cvrt_dscd_cols <- hdmtopt(optlst$cvrt_dscd_cols)
+  cvrt_kept_cols <- hdmtopt(optlst$cvrt_kept_cols)
   cvrt_dscd_rows <- c(glbl_blck_lst, hdmtopt(optlst$cvrt_dscd_rows))
+  cvrt_kept_rows <- hdmtopt(optlst$cvrt_kept_rows)
 
   cvrt_dtfm <- pprcs(
     cvrt_ipt, dscd_cols=cvrt_dscd_cols, dscd_rows=cvrt_dscd_rows,
-	zipped=cvrt_zip, as_idx=cvrt_idx_col, dscd_idx=cvrt_dscd_idx
+	zipped=cvrt_zip, as_idx=cvrt_idx_col, dscd_idx=cvrt_dscd_idx,
+	kept_cols=cvrt_kept_cols, kept_rows=cvrt_kept_rows
   )
 
   # Genotypes
@@ -833,7 +819,9 @@ qtlmp <- function(optlst) {
   gntp_idx_col <- optlst$gntp_idx_col
   gntp_dscd_idx <- as.logical(optlst$gntp_dscd_idx)
   gntp_dtfm_trp <- as.logical(optlst$gntp_dtfm_trp)
+  gntp_kept_rows <- hdmtopt(optlst$gntp_kept_rows)
   gntp_dscd_rows <- hdmtopt(optlst$gntp_dscd_rows)
+  gntp_kept_cols <- hdmtopt(optlst$gntp_kept_cols)
   gntp_dscd_cols <- c(hdmtopt(optlst$gntp_dscd_cols), glbl_blck_lst)
 
   qtl_dtfm <- data.frame()
@@ -851,7 +839,8 @@ qtlmp <- function(optlst) {
       gntp_file <- file.path(gntp_ipt, flnm)
       gntp_dtfm <- pprcs(
         gntp_file, dscd_cols=gntp_dscd_cols, as_idx=gntp_idx_col, trps=FALSE,
-		zipped=gntp_zip, dscd_idx=gntp_dscd_idx
+	    zipped=gntp_zip, dscd_idx=gntp_dscd_idx, kept_rows=gntp_kept_rows,
+	    kept_cols=gntp_kept_cols
       )
       qtl_dtfm <- rbind(
         qtl_dtfm, mkme(pntp_dtfm, gntp_dtfm, cvrt_dtfm)$all$eqtls
@@ -861,7 +850,8 @@ qtlmp <- function(optlst) {
     gntp_file <- gntp_ipt
     gntp_dtfm <- pprcs(
       gntp_file, dscd_cols=gntp_dscd_cols, as_idx=gntp_idx_col, trps=FALSE,
-	  zipped=gntp_zip, dscd_idx=gntp_dscd_idx
+	  zipped=gntp_zip, dscd_idx=gntp_dscd_idx, kept_rows=gntp_kept_rows,
+	  kept_cols=gntp_kept_cols
     )
     qtl_dtfm <- mkme(pntp_dtfm, gntp_dtfm, cvrt_dtfm)$all$eqtls
   } else {
