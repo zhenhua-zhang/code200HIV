@@ -161,42 +161,42 @@ Transformed subjects by `Inverse-rank`
 
 
 ## Anti-inflammatory Cytokine
-Data source:
+- Data source:
 	- L_antiInflamCytokineData200Hiv_boxCorData_log10_2019-03-20.csv
 
-Preprocessing by Wouter:
+- Preprocessing by Wouter:
 	- `log10` transform and Box correction
 
-Covariates:
+- Covariates:
 	- Age
 	- Gender
 	- seasonality/linear time variable
 	- BMI (remove)
 	- Smoking (packyears, remove)
 
-Transformed subjects by `Inverse-rank`
+- Transformed subjects by `Inverse-rank`
 	- None
 
-Discarded subjects
+- Discarded subjects
 
 
 ## Chemokine Cytokine
-Data source: 
+- Data source: 
 	- M_chemokineCytokineData200Hiv_boxCorData_log10_2019-03-20.csv
 
-Preprocessing by Wouter:
+- Preprocessing by Wouter:
 	- `log10` transform and Box correction
 
-Covariates:
+- Covariates:
 	- Age
 	- Gender
 	- seasonality/linear time variable
 	- BMI (remove)
 	- Smoking (packyears, remove)
 
-Transformed subjects by `Inverse-rank`
+- Transformed subjects by `Inverse-rank`
 
-Discarded subjects
+- Discarded subjects
 
 
 
@@ -210,12 +210,9 @@ Discarded subjects
 	- numDaysFromJan2015 (linear time)
 	- ssnlt_sin (seasonality sin part, sin(2*pi*numDaysFromJan2015/365))
 	- ssnlt_cos (seasonality cos part, cos(2*pi*numDaysFromJan2015/365))
-	- prcnt_mnct (percentage of monocytes, cell counts)
+	- prcnt_mnct (percentage of monocytes, cell counts, 200HIV50FG_SysmexPBMC_curated20190227.csv)
 	- D4P_TC_LMI1 (D4+ T cell, cell counts)
 	- D8P_TC_LMI1 (D8+ T cell, cell counts)
-
-  - Need to be added
-	- % monocytes (200HIV50FG_SysmexPBMC_curated20190227.csv)
 
   - Unknown source
 	- HIV_DURATION
