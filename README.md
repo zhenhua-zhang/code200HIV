@@ -2,19 +2,19 @@
 
 
 ## Plasmarkers
-Data source:
+- Data source:
 	- 200HIV_Plasmamarkers_20190528_YANG.csv
 
-Preprocessing by Wouter:
+- Preprocessing by Wouter:
 	- None
 
-Covariates:
+- Covariates:
 	- Age
 	- Gender
 	- BMI (remove)
 	- Smoking(packYears, remove)
 
-Transformed subjects by `log2`
+- Transformed subjects by `log2`
 	- AAT
 	- Adiponectin
 	- CRP
@@ -39,43 +39,43 @@ Transformed subjects by `log2`
 	- IL6_LOD
 	- BAFF_Result
 
-Transformed subjects by `Inverse-rank`
+- Transformed subjects by `Inverse-rank`
 	- IL-1A
 	- IL1b_LLOD
 
-Discarded subjects: 
+- Discarded subjects: 
 
 
 ## HIV reservoir
-Data source:
+- Data source:
 	- 20190524_HIVreservoir_GENT.csv
 
-Preprocessing by Wouter:
+- Preprocessing by Wouter:
 	- `log10` tranformed but still with an outlier
 
-Variable:
+- Variable:
 	- log10(RNA)
 	- log10(DNA)
 	- log10(RNA/DNA)
 
-Covariates:
+- Covariates:
 	- Age
 	- Gender
 	- CD4_NADIR
 
-Transformed subjects by `Inverse-rank`
+- Transformed subjects by `Inverse-rank`
 
-Discarded subjects: 
+- Discarded subjects: 
 
 
 ## Innate Cytokine (24h)
-Data source:
+- Data source:
 	- B_cytokineData200Hiv24h_boxCorData_log10_2019-03-20.csv
 
-Preprocessing by Wouter:
+- Preprocessing by Wouter:
 	- `log10` transform and Box correction
 
-Covariates:
+- Covariates:
 	- Age
 	- Gender
 	- % monocytes
@@ -83,7 +83,7 @@ Covariates:
 	- BMI (remove)
 	- Smoking(packYears, remove)
 
-Transformed subjects by `Inverse-rank`
+- Transformed subjects by `Inverse-rank`
 	- C.gattii_PBMC_24h_IL.1b
 	- C.gattii_PBMC_24h_IL.6
 	- C.gattii_PBMC_24h_TNF.a
@@ -108,18 +108,18 @@ Transformed subjects by `Inverse-rank`
 	- S.typhi_PBMC_24h_IL.1b
 	- S.typhimurium_PBMC_24h_IL.1b
 
-Discarded subjects: 
+- Discarded subjects: 
 	- None
 
 
 ## Stimilated Cytokine (7d)
-Data source:
+- Data source:
 	- C_cytokineData200Hiv7d_boxCorData_log10_2019-03-20.csv
 
-Preprocessing by Wouter:
+- Preprocessing by Wouter:
 	- `log10` transform and Box correction
 
-Covariates:
+- Covariates:
 	- Age
 	- Gender
 	- seasonality/linear time variable
@@ -128,7 +128,7 @@ Covariates:
 	- BMI (remove)
 	- Smoking (packyears, remove)
 
-Transformed subjects by `Inverse-rank`
+- Transformed subjects by `Inverse-rank`
 	- C.albicans.hyphae_PBMC_7d_IFNg
 	- C.albicans.hyphae_PBMC_7d_IL.17
 	- C.albicans.hyphae_PBMC_7d_IL.22
