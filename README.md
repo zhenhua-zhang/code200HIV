@@ -4,7 +4,7 @@
 
 ### TODO list for script 200HIV_qtl_mapping.R
 - [x] move each subcommand context in to separated functions
-- [x] add more logics for `trfm_nmlt()` to handle multiple transform methods
+- [ ] add more logics for `trfm_nmlt()` to handle multiple transform methods
 - [ ] add a more detailed logger
 - [ ] a function to produce report
 
@@ -12,6 +12,7 @@
 - [x] Models with linear time, cell counts, age, and gender as covariates
 - [ ] Calculate Spearman correlation between each cytokine production between cell counts
 - [ ] Pathway(IL.1β) analysis for Wouter
+
 
 ## Plasmarkers
 - Data source:
