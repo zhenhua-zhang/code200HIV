@@ -1,1 +1,4 @@
 .Rhistory
+
+*.gz
+*.tbi
