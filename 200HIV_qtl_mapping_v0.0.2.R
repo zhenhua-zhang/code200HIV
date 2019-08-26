@@ -89,7 +89,7 @@ pprcs <- function(flnm, dscd_cols=NULL, dscd_rows=NULL, kept_cols=NULL,
   if (is.null(kept_rows)) kept_rows <- row_names[which(!row_names %in% dscd_rows)]
 
   cat("[INFO]  Kept rows (first", min(swhd, length(kept_rows)), "of", length(kept_rows), "):", head(kept_rows, n=swhd), "...\n")
-  dtfm <- dtfm[kept_rows,]
+  dtfm <- dtfm[kept_rows, ]
 
   if (trps) {
     if (!is.null(as_idx)) {
@@ -100,7 +100,7 @@ pprcs <- function(flnm, dscd_cols=NULL, dscd_rows=NULL, kept_cols=NULL,
         idx_val <- dtfm[as_idx]
         dtfm <- dtfm[, which(!base::colnames(dtfm) %in% c(as_idx))]
         dtfm <- as.data.frame(t(dtfm), stringsAsFactors=FALSE)
-        dtfm[as_idx,] <- idx_val
+        dtfm[as_idx, ] <- idx_val
         dtfm <- dtfm[c(as_idx, base::rownames(dtfm))]
       }
     } else {
@@ -920,16 +920,15 @@ qtlrpt <- function(optlst) {
 # Main function
 #
 main <- function() {
-  # Trycatch clean up tmp_dir
   tryCatch({
     # Command line arguments
     agmntlst <- prsarg()
 
-	suppressWarnings(require(dplyr, quietly=TRUE, warn.conflicts=FALSE))
-	suppressWarnings(require(ggplot2, quietly=TRUE, warn.conflicts=FALSE))
-	suppressWarnings(require(stringi, quietly=TRUE, warn.conflicts=FALSE))
-	suppressWarnings(require(reshape2, quietly=TRUE, warn.conflicts=FALSE))
-	suppressWarnings(require(data.table, quietly=TRUE, warn.conflicts=FALSE))
+    suppressWarnings(require(dplyr, quietly = TRUE, warn.conflicts = FALSE))
+    suppressWarnings(require(ggplot2, quietly = TRUE, warn.conflicts = FALSE))
+    suppressWarnings(require(stringi, quietly = TRUE, warn.conflicts = FALSE))
+    suppressWarnings(require(reshape2, quietly = TRUE, warn.conflicts = FALSE))
+    suppressWarnings(require(data.table, quietly = TRUE, warn.conflicts = FALSE))
 
     opts <- agmntlst$options
     cfglst <- prcs_cfg(opts$config_file)
@@ -965,25 +964,23 @@ main <- function() {
     optlst$glbl_blck_lst <- hdmtopt(optlst$glbl_blck_lst)
 
     ## Check the normality of raw data
-  if (subcmd == "cknmlt") {
-    cknmlt(optlst)
-  } else if (subcmd == "trfm") {
-    trfm(optlst)
-  } else if (subcmd == "qtlmp") {
-    suppressWarnings(require(MatrixEQTL, quietly = TRUE, warn.conflicts = FALSE))
-    qtlmp(optlst)
-  } else if (subcmd == "qtlrpt") {
-    suppressWarnings(require(qqman, quietly = TRUE, warn.conflicts = FALSE))
-    suppressWarnings(require(GenomicRanges, quietly = TRUE, warn.conflicts = FALSE))
-    suppressWarnings(require(VariantAnnotation, quietly = TRUE, warn.conflicts = FALSE))
-    qtlrpt(optlst)
-  } else {
-    stop("Unknow error while processing sub-command: ", subcmd)
-  }
+    if (subcmd == "cknmlt") {
+      cknmlt(optlst)
+    } else if (subcmd == "trfm") {
+      trfm(optlst)
+    } else if (subcmd == "qtlmp") {
+      suppressWarnings(require(MatrixEQTL, quietly = TRUE, warn.conflicts = FALSE))
+      qtlmp(optlst)
+    } else if (subcmd == "qtlrpt") {
+      suppressWarnings(require(qqman, quietly = TRUE, warn.conflicts = FALSE))
+      suppressWarnings(require(GenomicRanges, quietly = TRUE, warn.conflicts = FALSE))
+      suppressWarnings(require(VariantAnnotation, quietly = TRUE, warn.conflicts = FALSE))
+      qtlrpt(optlst)
+    } else {
+      stop("Unknow error while processing sub-command: ", subcmd)
+    }
 
     cat("[INFO]  Success!!!\n\n------------------------------------\n")
-    # cat("[INFO]  Clean up tmp files ...\n")
-    # unlink(optlst$tmp_dir)
   }, error=function(e) {
     cat("[ERROR] ", e$message, "\n")
     print(e)
@@ -1028,7 +1025,7 @@ test_fetch_vcf <- function() {
   info(tspc_vcf) <- tspc_info
 
   tspc_header_info <- info(header(tspc_vcf))
-  tspc_header_info <- tspc_header_info[which(!rownames(tspc_header_info) %in% c("ASP", "ASS")),]
+  tspc_header_info <- tspc_header_info[which(!rownames(tspc_header_info) %in% c("ASP", "ASS")), ]
   info(header(tspc_vcf)) <- tspc_header_info
   info(header(tspc_vcf))
 }
