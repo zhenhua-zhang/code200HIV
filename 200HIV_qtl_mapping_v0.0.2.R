@@ -1,4 +1,5 @@
 #!/usr/bin/env Rscript
+# Using R 3.3.3
 ###############################################################################
 #' @version: 0.2.0
 #' @author: Zhenhua Zhang <zhenhua.zhang217@gmail.com>
@@ -22,18 +23,8 @@
 
 # Used packages
 # TODO: 1. Add version for each library
-library(qqman)
-library(dplyr)
-library(ggplot2)
-library(methods)
-library(stringi)
-library(optparse)
-library(reshape2)
-library(docstring)
-library(data.table)
-library(MatrixEQTL)
-library(GenomicRanges)
-library(VariantAnnotation)
+# library(docstring)
+library(optparse, warn.conflicts=FALSE, quietly=TRUE)
 
 
 # Processing the configuration file
@@ -75,8 +66,8 @@ smt_fread <- function(flnm, zipped=FALSE, data.table=FALSE, header=TRUE, strings
 # Preprocess
 pprcs <- function(flnm, dscd_cols=NULL, dscd_rows=NULL, kept_cols=NULL,
   kept_rows=NULL, trps=TRUE, as_idx="id", dscd_idx=FALSE, zipped=FALSE,
-  swhd=20) {
-  cat("[INFO]  Processing:", flnm, "\n")
+  swhd=10) {
+  cat("[INFO]  Processing:", flnm, "...\n")
 
   dtfm <- smt_fread(flnm, zipped=zipped)
 
@@ -91,13 +82,13 @@ pprcs <- function(flnm, dscd_cols=NULL, dscd_rows=NULL, kept_cols=NULL,
 
   if (is.null(kept_cols)) kept_cols <- col_names[which(!col_names %in% dscd_cols)]
 
-  cat("[INFO]  Kept cols(first", swhd, "of", length(kept_cols), "): ", head(kept_cols, n=swhd), "\n")
+  cat("[INFO]  Kept cols (first", min(swhd, length(kept_cols)), "of", length(kept_cols), "):", head(kept_cols, n=swhd), "...\n")
   dtfm <- dtfm[, kept_cols]
 
   row_names <- base::rownames(dtfm)
   if (is.null(kept_rows)) kept_rows <- row_names[which(!row_names %in% dscd_rows)]
 
-  cat("[INFO]  Kept rows(first", swhd, "of", length(kept_rows), "): ", head(kept_rows, n=swhd), "\n")
+  cat("[INFO]  Kept rows (first", min(swhd, length(kept_rows)), "of", length(kept_rows), "):", head(kept_rows, n=swhd), "...\n")
   dtfm <- dtfm[kept_rows,]
 
   if (trps) {
@@ -224,6 +215,10 @@ trfm_nmlt <- function(dtfm, dscd_cols=NULL, trfm_cols=NULL, trfm_mthd="log2", id
 
 # Draw PCA
 plt_pca <- function(dtfm, opt_flnm="Outlier_check_PCA.pdf", idcol="id", fgwd=10, fght=10, fgunt="in", n_sd=3) {
+  #' @title Draw PCA plot
+  #' @description Draw a PCA plot to check the outliers.
+  #' @param dtfm A dataframe.
+
   cat("[INFO]  Plotting PCA... \n")
 
   if (!is.data.frame(dtfm)) stop("`dtfm` should be a dataframe ...")
@@ -293,7 +288,7 @@ prcs_otls <- function(dtfm, n_sd=3, idcol="id") {
 }
 
 
-# Create SliceDate object
+# Create SliceData object
 mkslcdt <- function(ipt, dlmt=",", omchr="NA", skprw=0, skpcl=0, slice_size=2000) {
   # cat("[INFO]  Creating SlicedData ...\n")
   slcdt <- SlicedData$new()
@@ -336,7 +331,9 @@ mkme <- function(pntp, gntp, cvrt=NULL, opt_file=NULL, pv_opt_thr=5e-2) {
 # Intersect Matrix eQTL with SNP information
 itsct_qtlmt_ifmt <- function(qtls, snp_ifmt, mgby_x="snps", mgby_y="rsID") {
   cat("[INFO]  Intersect QTL matrix with SNP information ...\n")
+  if (is.character(qtls))
   qtls <- smt_fread(qtls)
+  if (is.character(snp_ifmt))
   snp_ifmt <- smt_fread(snp_ifmt)
   return(merge(qtls, snp_ifmt, by.x=mgby_x, by.y=mgby_y))
 }
@@ -628,10 +625,10 @@ prsarg <- function() {
   agmnts <- parse_args(parser, positional_arguments=1, convert_hyphens_to_underscores=TRUE)
 
   # cknmlt: check normality; trfm: Transform data;
-  # qltmp: QTL mapping; qtlrpt: produce QTL report; all: do all steps in one
+  # qltmp: QTL mapping; qtlrpt: produce QTL report.
   subcmd <- agmnts$args
-  subcmdlst <- c("cknmlt", "trfm", "qtlmp", "qtlrpt", "all")
-  if (!subcmd %in% subcmdlst) stop("Unknown: ", subcmd, ". Opts: cknmlt, trfm, qtlmp, qtlrpt, all")
+  subcmdlst <- c("cknmlt", "trfm", "qtlmp", "qtlrpt")
+  if (!subcmd %in% subcmdlst) stop("Unknown: ", subcmd, ". Opts: cknmlt, trfm, qtlmp, qtlrpt")
 
   return(agmnts)
 }
@@ -769,8 +766,10 @@ qtlmp <- function(optlst) {
   glbl_blck_lst <- optlst$glbl_blck_lst
 
   ipt_tmp_flnm <- file.path(tmp_dir, "trfm_tmp.csv")
-  if (file.exists(ipt_tmp_flnm)) pntp_dtfm <- pprcs(ipt_tmp_flnm, dscd_cols=c("id"), trps=TRUE)
-  else stop("Failed to fined temporary file ", ipt_tmp_flnm)
+  if (file.exists(ipt_tmp_flnm)) 
+	pntp_dtfm <- pprcs(ipt_tmp_flnm, dscd_cols=c("id"), trps=TRUE)
+  else
+	stop("Failed to fined temporary file ", ipt_tmp_flnm)
 
   # Covariates
   cvrt_ipt <- optlst$covariates
@@ -844,7 +843,7 @@ qtlrpt <- function(optlst) {
   pvalue <- qtlrpt_mhtnplt_cols[4]
 
   msmnts <- unique(qtl_dtfm$gene) # msmnts: measurements a.k.a traits or phenotypes
-  for (msmnt in msmnts) {
+  for (msmnt in msmnts[1:3]) {
     msmnt_dtfm <- qtl_dtfm[which(qtl_dtfm$gene == msmnt), ]
 
     opt_prfx <- file.path(optlst$opt_mhtn_dir, msmnt)
@@ -859,15 +858,6 @@ qtlrpt <- function(optlst) {
 	}
   }
 
-  #  Plot genotype level for top SNPs
-  ## Fetch phenotypes by read temp-files. A dataframe with column as subjects, rows as measurements
-  ipt_tmp_flnm <- file.path(tmp_dir, "trfm_tmp.csv")
-  pntp_idx_col <- optlst$pntp_idx_col
-  if (!file.exists(ipt_tmp_flnm))
-	stop("Failed to find temporary file ", ipt_tmp_flnm)
-  pntp_dtfm <- pprcs(ipt_tmp_flnm, dscd_cols=pntp_idx_col, trps=TRUE)
-  use_pntp <- pntp_dtfm[which(base::rownames(pntp_dtfm) %in% unique(tspc$gene)), ]
-
   # Fetch top SNPs per chrom
   qtlrpt_tspc_pvt <- as.numeric(optlst$qtlrpt_tspc_pvt) # Top SNP per chrom p-value threshold
   qtlrpt_tspc_cols <- hdmtopt(optlst$qtlrpt_tspc_cols)  # Cols will be used from the qtl_dtfm
@@ -876,6 +866,15 @@ qtlrpt <- function(optlst) {
 
   if (dim(tspc)[1] == 0)
 	return(cat("[WARN]  tspc(dataframe top snp per chrom) is empty. Exit ...\n"))
+
+  #  Plot genotype level for top SNPs
+  ## Fetch phenotypes by read temp-files. A dataframe with column as subjects, rows as measurements
+  ipt_tmp_flnm <- file.path(tmp_dir, "trfm_tmp.csv")
+  pntp_idx_col <- optlst$pntp_idx_col
+  if (!file.exists(ipt_tmp_flnm))
+	stop("Failed to find temporary file ", ipt_tmp_flnm)
+  pntp_dtfm <- pprcs(ipt_tmp_flnm, dscd_cols=pntp_idx_col, trps=TRUE)
+  use_pntp <- pntp_dtfm[which(base::rownames(pntp_dtfm) %in% unique(tspc$gene)), ]
 
   # Dump VCF records for the top SNPs per chromosome to drive
   # FIXME: need a lot dependencies, could be not efficient.
@@ -923,6 +922,13 @@ main <- function() {
   tryCatch({
     # Command line arguments
     agmntlst <- prsarg()
+
+	suppressWarnings(require(dplyr, quietly=TRUE, warn.conflicts=FALSE))
+	suppressWarnings(require(ggplot2, quietly=TRUE, warn.conflicts=FALSE))
+	suppressWarnings(require(stringi, quietly=TRUE, warn.conflicts=FALSE))
+	suppressWarnings(require(reshape2, quietly=TRUE, warn.conflicts=FALSE))
+	suppressWarnings(require(data.table, quietly=TRUE, warn.conflicts=FALSE))
+
     opts <- agmntlst$options
     cfglst <- prcs_cfg(opts$config_file)
     optlst <- mgcfgcmd(agmntlst, cfglst)
@@ -957,23 +963,27 @@ main <- function() {
     optlst$glbl_blck_lst <- hdmtopt(optlst$glbl_blck_lst)
 
     ## Check the normality of raw data
-    if (subcmd == "cknmlt") cknmlt(optlst)
-    else if (subcmd == "trfm") trfm(optlst)
-    else if (subcmd == "qtlmp") qtlmp(optlst)
-    else if (subcmd == "qtlrpt") qtlrpt(optlst)
-    else if (subcmd == "all") {
-      cknmlt(optlst)
-      trfm(optlst)
-      qtlmp(optlst)
-      qtlrpt(optlst)
-    }
-    else stop("Unknow error while processing sub-command: ", subcmd)
+	if (subcmd == "cknmlt") {
+	  cknmlt(optlst)
+	} else if (subcmd == "trfm") {
+	  trfm(optlst)
+	} else if (subcmd == "qtlmp") {
+	  suppressWarnings(require(MatrixEQTL, quietly=TRUE, warn.conflicts=FALSE))
+	  qtlmp(optlst)
+	} else if (subcmd == "qtlrpt") {
+	  suppressWarnings(require(qqman, quietly=TRUE, warn.conflicts=FALSE))
+	  suppressWarnings(require(GenomicRanges, quietly=TRUE, warn.conflicts=FALSE))
+	  suppressWarnings(require(VariantAnnotation, quietly=TRUE, warn.conflicts=FALSE))
+	  qtlrpt(optlst)
+	} else {
+	  stop("Unknow error while processing sub-command: ", subcmd)
+	}
 
     cat("[INFO]  Success!!!\n\n------------------------------------\n")
-    cat("[INFO]  Clean up tmp files ...")
-    unlink(optlst$tmp_dir)
+    # cat("[INFO]  Clean up tmp files ...\n")
+    # unlink(optlst$tmp_dir)
   }, error=function(e) {
-    cat("[ERROR]  ", e$message, "\n")
+    cat("[ERROR] ", e$message, "\n")
     print(e)
   })
 }
@@ -1022,4 +1032,4 @@ test_fetch_vcf <- function() {
   info(header(tspc_vcf))
 }
 
-test_fetch_vcf()
+# test_fetch_vcf()
