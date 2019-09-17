@@ -386,7 +386,7 @@ plt_mht <- function(qtls_lst, use_cols = NULL, opt_prfx = "qtl_mapping", svfmt =
 }
 
 
-# Filter out check the number of mode
+# Filter out by checking the number of mode
 ckmd <- function(dtfm, thrshld = 0.5) {
   if (is.data.frame(dtfm)) {
     res <- sapply(dtfm,
@@ -465,7 +465,7 @@ mkvcfprm <- function(rgstr = NULL, chrom = NULL, start = NULL, stop = NULL, oneb
     chrom <- c(as.character(chrom))
     if (is.null(start)) start <- rep(1, length(chrom))
     if (is.null(stop)) stop <- start
-    }
+  }
 
   if (length(chrom) != length(start) || length(start) != length(stop))
     stop("start and stop should have the same length ...")
