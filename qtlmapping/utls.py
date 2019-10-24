@@ -24,43 +24,72 @@ log_me.addHandler(ch)
 #
 ## A function to help setup working directories
 #
-def setup_wd(path="qtlmapping_report"):
+def setup_wd(path, override=False):
     """Setup working directory at given path
 
     The structure of the output directory
-    output_dir
-    |-- logs
-    |-- reports
-    |   |-- GenotypeLevelPlots
-    |   |-- QTLInformation
-    |   |-- LocusZoomPlots
-    |   |-- ManhattanPlots
-    |   |-- Preprocessing
-    |   |-- PathwayAnalysis
-    |-- report.tsv
+    PATH
+    |-- logs (Not decided yet)
+    |-- PhenotypeLevelPlots/
+    |-- QTLInformation/
+    |-- LocusZoomPlots/
+    |-- ManhattanPlots/
+    |-- Preprocessing/
+    |-- PathwayAnalysis/
+    |-- TempDir/ (Will be removed after calling `clean_up()` function)
+    |-- report.tsv (Not decided yet)
 
-    TODO:
-        1. report.tsv need a head line?
+    Args:
+        path (str): The path to create the working directory. Default: ./qtlmapping_report
+    Raises:
+    Returns:
+    Todos:
+    Notes:
     """
-    os.mkdir(path)
-    os.mkdir(os.path.join(path, "reports"))
+    if os.path.exists(path):
+        if override:
+            log_me.warn(
+                "{} exists, but will use it directly.".format(path) + 
+                " Start checking mandatory subdirectories"
+            )
+        else:
+            log_me.error("{} exists, exiting ...".format(path))
+            sys.exit()
+    else:
+        os.mkdir(path)
+
     compulsary_dirs = [
-        "GenotypeLevelPlots", "QTLInformation", "LocusZoomPlots",
+        "PhenotypeLevelPlots", "QTLInformation", "LocusZoomPlots",
         "ManhattanPlots", "Preprocessing", "PathwayAnalysis",
     ]
 
     for _dir in compulsary_dirs:
-        os.mkdir(os.path.join(path, _dir))
+        sub_dir = os.path.join(path, _dir) 
+        if override:
+            if os.path.exists(sub_dir):
+                log_me.info("{} exists ...".format(sub_dir))
+            else:
+                log_me.warn("{} doesn't exist, creating it...".format(sub_dir))
+                os.mkdir(sub_dir)
+        else:
+            os.mkdir(sub_dir)
+
+
+def clean_up():
+    """A function to remove temporary files in `YOUR_WK_DIR/TempDir`.
+    """
+    log_me.info("Start cleaning up your sh*t ...")
+    not_implemented()
 
 
 def not_runnable():
     """A funnction to warn the user that the script is not runnable."""
-    log_me.warn("Not a runnable script!!!!", file=sys.stderr)
+    log_me.warn("Not a runnable script!!!!")
 
 
 def not_implemented():
     """A funnction to warn the user that the function isn't implemented and exit."""
-    log_me.warn("Not implemented yet!!!!", file=sys.stderr)
+    log_me.warn("Not implemented yet!!!!")
     sys.exit(-1)
 
 
