@@ -977,7 +977,7 @@ main <- function() {
       suppressWarnings(require(VariantAnnotation, quietly = TRUE, warn.conflicts = FALSE))
       qtlrpt(optlst)
     } else {
-      stop("Unknow error while processing sub-command: ", subcmd)
+      stop("Unknown error while processing sub-command: ", subcmd)
     }
 
     cat("[INFO]  Success!!!\n\n------------------------------------\n")
