@@ -1,7 +1,10 @@
 .Rhistory
-
 *.gz
 *.tbi
 functions
+.vscode
 
 **/_*/
+
+.*
+**/.*
