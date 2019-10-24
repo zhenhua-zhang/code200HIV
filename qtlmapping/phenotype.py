@@ -1,5 +1,9 @@
 # -*- UTF-8 -*-
 
+#
+## phenotype.py
+#
+
 # TODO: Finish the document
 import os
 import sys
@@ -26,10 +30,13 @@ from utls import UnknownCorrelationMethod
 
 
 class Phenotype(PreProc):
-    """An phenotype object
+    """A phenotype class.
+
     Attributes:
+    Methods:
+    InherenteFrom:
     Examples:
-    To-dos:
+    Todos:
     Notes:
         1. If there are less than three phenotypes, remove outliers by PCA isn't plausible.
     """
@@ -48,34 +55,31 @@ class Phenotype(PreProc):
             raise TypeError("wk_dir should be a direcotry")
 
         super().__init__(ipt)
-        self.wk_dir = wk_dir
-        self.norm_plots = None          # Histgram to check the normality of each phenotype measurement
-        self.pca = None                 # The result of PCA
-        self.pca_plot = None            # PCA plot to show the outliers. Phenotype vector in new space could be informative
-        self.safe_zone = None           # [mean - pad * std, mean + pad * std]
-        self.pw_corr = None             # The pairwise correlation of phenotype values
-        self.pw_corr_plot = None           # Pair-wise correlation plot of phenotypes
-        self.pheno_signals = None       # Phenotypes with too many repeated values
-        self._pad = 0
+        self.wk_dir = wk_dir       # Working direcotry for current project
+        self.norm_plots = None     # Histgram to check the normality of each phenotype measurement
+        self.pca = None            # The result of PCA
+        self.pca_plot = None       # PCA plot to show the outliers. Phenotype vector in new space could be informative
+        self.safe_zone = None      # [mean - pad * std, mean + pad * std]
+        self.pw_corr = None        # The pairwise correlation of phenotype values
+        self.pw_corr_plot = None   # Pair-wise correlation plot of phenotypes
+        self.pheno_signals = None  # Phenotypes with too many repeated values
+        self.pad = 0               # Padding of mean to get the safe zone
 
     def check_norm(self):
         """Check the normality of each phenotype.
 
         Args: None
-
         Raises: None
-
         Returns:
             self: the instance itself
-
-        To-dos: this should be achieve as interactive.
+        Todos: this should be achieve as interactive.
         """
         mnfl_dtfm = self.wk_dtfm.fillna(self.wk_dtfm.mean())
 
         norm_plots = sbn.PairGrid(mnfl_dtfm)
         norm_plots.map_upper(sbn.regplot, scatter_kws={"s": 1}, line_kws={"linewidth": 1})
         norm_plots.map_diag(sbn.distplot)
-        norm_plots.map_lower(sbn.kdeplot, linewidth=0.5)
+        norm_plots.map_lower(sbn.kdeplot)
 
         self.norm_plots = norm_plots
         
@@ -87,28 +91,39 @@ class Phenotype(PreProc):
         Args:
             func (callable): [math.log10] Function used to transform the phenotype data.
             target (None, list, tuple): [None] Columns will be transformed by given `func`.
-
         Raises: None
-
         Returns:
             Self: the instance itself
         """
         if target:
             log_me.info("Transform the following phenotypes by {}: {}".format(func.__name__, ", ".join(target)))
             self.wk_dtfm.loc[:, target] = self.wk_dtfm.loc[:, target].applymap(func)
-
             if not isinstance(target, (list, tuple)):
                 target = [target]
         else:
             log_me.info("Transform all phenotypes by {}".format(func.__name__))
             self.wk_dtfm = self.wk_dtfm.applymap(func)
-
             target = list(self.wk_dtfm.columns)
 
         name_map = dict(zip(target, [x + "_" + func.__name__ for x in target]))
-
         self.wk_dtfm = self.wk_dtfm.rename(columns=name_map)
 
+        return self
+
+    def calc_corr(self, target=None, method="spearman", dist_mthd="ward"):
+        """Caluculate the correlation between phenotypes (Pairwise).
+
+        Args:
+            target (list, tuple, None): [None] All the combination or subset of all phenotypes, the later can be specified by and list
+            method (str, callable): ['spearman'] The method use to calculate the correlation. Options: [spearman, pearson, kendall]. For more info, refer to `pandas.DataFrame.coor()`
+            dist_mthd (str): ['ward'] Method used to calculate the distance between correlations.
+        Raises:
+            TypeError: When the target augument given value type beyound None, tuple, and list
+        Returns:
+            self: The instance itself
+        """
+        super().calc_corr(target, method, dist_mthd)
+        self.pw_corr_plot = sbn.clustermap(self.pw_corr)
         return self
 
     def calc_pca(self, target=None, pad=3):
@@ -117,18 +132,18 @@ class Phenotype(PreProc):
         Args:
             target (list, tuple, None): [None] Columns will be used to do PCA analysis. If it's `None`, the program will take all columns to do the analysis.
             pad (int): [3] Times of standard deviation.
-
         Raises: None
-
         Returns:
             self: the instance itself
+        Notes:
+            1. 需要注意行列，PCA以列为phenotype，行为samples
         """
         def calc_comp_safe_zone(vals, pad):
             _mean = np.mean(vals)
             _std = np.std(vals)
             return [_mean - pad * _std, _mean + pad * _std]
 
-        pca = PCA(n_components="mle")  # Automatic choosing dimentionality
+        pca = PCA()  # Automatic choosing dimentionality
         if target is None:
             log_me.info("Will use all features in `wk_dtfm` to do PCA analysis")
             target = self.wk_dtfm.columns
@@ -193,9 +208,7 @@ class Phenotype(PreProc):
         Args:
             by (numpy.NaN, int, float): [numpy.NaN] Will replace the measure of outliers by numpy.NaN
             pad (int): [3] Times of standard deviation
-        
         Raises: None
-
         Returns:
             Self: the instance itself
         """
@@ -205,7 +218,7 @@ class Phenotype(PreProc):
             upper = safe_zone.loc[pheno_name, "upper"]
             return ~pheno_vals.between(lower, upper)
 
-        self._pad = 3
+        self.pad = 3
         means = self.wk_dtfm.apply(np.mean, axis=0)
         stds = self.wk_dtfm.apply(np.std, axis=0)
         lower, upper = means - pad * stds, means + pad * stds
@@ -216,47 +229,13 @@ class Phenotype(PreProc):
 
         return self
 
-    def calc_corr(self, target=None, method="spearman", dist_mthd="ward"):
-        """Caluculate the correlation between phenotypes (Pairwise).
-
-        Args:
-            target (list, tuple, None): [None] All the combination or subset of all phenotypes, the later can be specified by and list
-            method (str, callable): ['spearman'] The method use to calculate the correlation. Options: [spearman, pearson, kendall]. For more info, refer to `pandas.DataFrame.coor()`
-            dist_mthd (str): ['ward'] Method used to calculate the distance between correlations.
-
-        Raises:
-            UknownCorrelationMethod: Unknown type of correlation method>
-            TypeError: When the target augument given value type beyound None, tuple, and list
-
-        Returns:
-            self: The instance itself
-        """
-        if method in ["spearman", "pearson", "kendall"]:
-            log_me.info("Will use {}".format(method))
-        elif callable(method):
-            log_me.info("User custom callable {}".format(method))
-        else:
-            raise UnknownCorrelationMethod
-
-        if target is None:
-            self.pw_corr = self.wk_dtfm.corr(method=method)  # Pairwise
-        elif isinstance(target, (tuple, list)):
-            self.pw_corr = self.wk_dtfm.loc[:, target].corr(method=method)
-        else:
-            raise TypeError("`target` should be a list or tuple, otherwise leave target as None using all")
-
-        self.pw_corr_plot = sbn.clustermap(self.pw_corr)
-        
-        return self
-
     def pop_bad_phenos(self, threshold=0.5, target=None):
         """Remove phenotypes with low signal.
+
         Args:
             threshold (float): [0.5] The ratio of the mode value should not be higher than the threshold
             target (list, tuple, None): [None]. Only check given phenotypes by target
-
         Raises: None
-
         Return:
             self: the instance itself
         """
@@ -288,9 +267,7 @@ class Phenotype(PreProc):
             dump_phenos (bool): [False] Whether dump processed phenotype dataframe to the disk
             dump_ppr (bool): [True] Whether dump preprocessing report into disk
             dump_pw_corr (bool): [False] Whether dump pair-wise correlation between phenotypes to disk
-
         Raises: None
-
         Return: None
         """
         ppr_path = pjoin(self.wk_dir, "Preprocessing")
@@ -306,9 +283,9 @@ class Phenotype(PreProc):
             self.norm_plots.savefig(path)
         
         if dump_phenos:
-            path = pjoin(ppr_path, "phenotypes_preprocessed.tsv")
+            path = pjoin(ppr_path, "phenotypes.tsv")
             log_me.info("Dump preprocessed phenotypes to file: {}".format(path))
-            self.dump_wkdtfm(ppr_path, "phenotypes_preprocessed.tsv")
+            self.dump_wkdtfm(ppr_path, "phenotypes.tsv", sep="\t", discard_wkdtfm=False)
 
         if self.pw_corr_plot is not None:
             path = pjoin(ppr_path, "phenotypes_pairwise_correlation.pdf")
@@ -316,7 +293,7 @@ class Phenotype(PreProc):
             self.pw_corr_plot.savefig(path)
 
         if dump_pw_corr:
-            path = pjoin(ppr_path, "phenotypes_pairwise_correlations.tsv")
+            path = pjoin(ppr_path, "phenotypes_pairwise_correlation.tsv")
             log_me.info("Dump phenotype pairwise correlations to file: {}".format(path))
             self.pw_corr.to_csv(path, sep="\t", header=True, index=True)
 
@@ -324,10 +301,10 @@ class Phenotype(PreProc):
             report_dict = {
                 "The percentage of modes in each phenotypes": self.pheno_signals.to_list(),
                 "The processed dataframe has multiple index": self.mltp_index,
-                "The {} times interval of each phenotypes".format(self._pad): self.safe_zone.to_dict(),
+                "The {} times interval of each phenotypes".format(self.pad): self.safe_zone.to_dict(),
                 "The matrix's transposing times": self.trps_counts,
-                "The removed 'columns'": self.rmd_cols,
-                "The removed 'rows'": self.rmd_rows,
+                "The removed 'columns'": self.rmd_cols.to_dict(),
+                "The removed 'rows'": self.rmd_rows.to_dict(),
             }
 
             path = pjoin(ppr_path, "phenotypes_preprocessing_report.json")
