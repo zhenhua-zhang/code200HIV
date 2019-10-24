@@ -26,7 +26,7 @@ Output:
 Preprocessing
     - Check the normality of the phenotype data.
     - Transformation using log10 / inverse-rank / log2 etc. if not normal distributed.
-    - Remove outliers using PCA or $mean -/+ n * sd$
+    - Remove outliers using PCA or mean -/+ n * sd
 
 QTL-mapping
     - Logistic regression
@@ -48,9 +48,3 @@ Bonus analysis
 - Pathway enrichment analysis
 
 ## Misc
-### Phenotype file format
-    | Phenotype_1 | Phenotype_2 | ... | Phenotype_n |
- id1|             |             |     |             |
- id2|             |             |     |             |
- ...|             |             |     |             |
- idn|             |             |     |             |
