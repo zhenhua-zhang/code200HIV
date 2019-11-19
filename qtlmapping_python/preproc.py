@@ -51,21 +51,13 @@ class PreProc:
                    as_wkdf: bool = False, mtidx: bool = False, **kwargs):
         """Load the given file(s) into memory.
 
-        The function will load files under given pattern (ptrn) from given path (path). It can be
-        used more than once to handle multiple data-loading events. By default, it'll set the
-        firstly loaded dataframe as activated one (aka self.wk_dtfm), no matter how many times it's
-        called. However, you can specify the activated dataframe by set as_wkdf=True when calling
-        the method, which will deactivate the last activated one and you get a warning message.  In
-        case you don't use as_wkdf=True at all, the activated dataframe is either the first loaded
-        dataframe or the one that specified by calling set_wkdf() which requires the signature(given
-        by dtfm_sig) of dataframe you want to work on.
+        The function will load files under given pattern (ptrn) from given path (path). It can be used more than once to handle multiple data-loading events. By default, it'll set the firstly loaded dataframe as activated one (aka self.wk_dtfm), no matter how many times it's called. However, you can specify the activated dataframe by set as_wkdf=True when calling the method, which will deactivate the last activated one and you get a warning message.  In case you don't use as_wkdf=True at all, the activated dataframe is either the first loaded dataframe or the one that specified by calling set_wkdf() which requires the signature(given by dtfm_sig) of dataframe you want to work on.
 
         Args:
             path (str, optional): Path to the files will be loaded. Default: None
             ptrn (str, optional): In given path, the pattern of files to be loaded. Default: None
             dtfm_sig (str, optional): The signature for new added DataFrame.  Default: None
-            as_wkdf (bool, optional): Whether the current loaded files will be the working
-                DataFrame. Default: False
+            as_wkdf (bool, optional): Whether the current loaded files will be the working DataFrame. Default: False
             mtidx (bool, optional): Using multiple index or not. Default: False
             **kwargs: Any arguments for pandas.read_csv().
         Raises:
@@ -75,8 +67,7 @@ class PreProc:
         Returns:
             self: the instance itself.
         Notes:
-            1. Prone to path when self.inpt_path is given; prone to prtn when self.inpt_ptrn is
-               given at the same time
+            1. Prone to path when self.inpt_path is given; prone to prtn when self.inpt_ptrn is given at the same time
             2. For kwargs, there're some default value: sep("\t"), index_col(0), header(0).
         Todos:
         """
@@ -110,8 +101,7 @@ class PreProc:
 
             frames, frame_names = [], []
             files = glob.glob(pjoin(path, ptrn))
-            log_me.info("Read from directory: {}".format(path))
-            log_me.info("Will find files following patterns: {}".format(ptrn))
+            log_me.info("Read files following patterns({}) from dir ({}). ".format(ptrn, path))
 
             for _file in files:
                 if pisfile(_file):
@@ -129,6 +119,7 @@ class PreProc:
             else:
                 rw_dtfm = pd.concat(frames)
         elif pisfile(path):
+            log_me.info("Read file {}".format(path))
             rw_dtfm = pd.read_csv(path, **kwargs)
         else:
             raise TypeError("Only direcotries or general file is valid")
@@ -289,9 +280,6 @@ class PreProc:
 
         if "sep" not in kwargs:
             kwargs["sep"] = "\t"
-
-        if self.wk_dtfm.index.name is None:
-            self.wk_dtfm.index.name = "snpid"
 
         opt_path = pjoin(opt_dir, opt_fnm)
         self.wk_dtfm.to_csv(opt_path, index=True, header=True, **kwargs)

@@ -1,0 +1,123 @@
+Loading required package: stringr
+Loading required package: ggplot2
+Loading required package: GGally
+Loading required package: qqman
+
+For example usage please run: vignette('qqman')
+
+Citation appreciated but not required:
+Turner, S.D. qqman: an R package for visualizing GWAS results using Q-Q and manhattan plots. biorXiv DOI: 10.1101/005165 (2014).
+
+Loading required package: data.table
+Loading required package: MatrixEQTL
+There were 25 warnings (use warnings() to see them)
+For DNAHIV_CD4LOG the outlier index out of 4 * SD boundary [1.185426, 5.033975]: 
+   
+For RNAHIV_CD4LOG the outlier index out of 4 * SD boundary [0.2107436, 4.102285]: 
+  X1199 
+For RNAvsDNA_CD4LOG the outlier index out of 4 * SD boundary [-2.438436, 0.5200426]: 
+   
+phenotypes_forME dim: 3 218 
+covariates_forME dim: 4 211 
+genotypes_forME dim: 4279984 215 
+Samples ( 207 ) will be fed to MatrixEQTL: X1001 X1002 X1003 X1004 X1005 X1006 X1007 X1008 X1010 X1011 X1013 X1014 X1015 X1016 X1017 X1018 X1019 X1020 X1021 X1022 X1023 X1024 X1025 X1026 X1027 X1028 X1029 X1030 X1031 X1032 X1033 X1034 X1035 X1036 X1037 X1038 X1039 X1040 X1041 X1042 X1043 X1044 X1045 X1046 X1047 X1048 X1049 X1050 X1051 X1052 X1054 X1055 X1056 X1057 X1058 X1059 X1060 X1061 X1062 X1063 X1064 X1065 X1066 X1067 X1068 X1069 X1070 X1071 X1072 X1073 X1074 X1075 X1076 X1077 X1078 X1079 X1080 X1081 X1082 X1083 X1084 X1085 X1086 X1087 X1088 X1089 X1090 X1091 X1092 X1093 X1094 X1095 X1096 X1097 X1098 X1099 X1100 X1102 X1103 X1104 X1105 X1106 X1107 X1108 X1110 X1111 X1112 X1113 X1114 X1115 X1116 X1117 X1118 X1119 X1120 X1121 X1122 X1123 X1124 X1127 X1130 X1131 X1132 X1133 X1134 X1135 X1136 X1137 X1138 X1139 X1140 X1141 X1143 X1144 X1145 X1146 X1147 X1148 X1149 X1151 X1152 X1153 X1154 X1155 X1156 X1157 X1158 X1159 X1160 X1161 X1162 X1163 X1164 X1165 X1166 X1167 X1168 X1169 X1170 X1171 X1172 X1173 X1174 X1175 X1176 X1177 X1178 X1179 X1180 X1181 X1182 X1183 X1184 X1185 X1186 X1187 X1188 X1189 X1190 X1191 X1192 X1194 X1195 X1196 X1197 X1198 X1199 X1200 X1201 X1202 X1203 X1204 X1205 X1206 X1207 X1208 X1209 X1210 X1211 X1212 X1213 X1214 X1215 X1216 X1217 X1218 X1219 
+Raw phenotype
+Processing covariates
+Task finished in 0.00300000000001432 seconds
+Processing gene expression data (imputation, residualization)
+Task finished in 0.0029999999999859 seconds
+Creating output file(s)
+Task finished in 0.602000000000004 seconds
+Performing eQTL analysis
+100.00% done, 12,827,341 eQTLs
+Task finished in 259.66 seconds
+
+Warning message:
+In Matrix_eQTL_main(snps = snps, gene = gene, cvrt = cvrt, output_file_name = output_file_name,  :
+  Warning: pvOutputThreshold may be too large.
+Expected number of findings > 12827112.048
+[1] "rs7113204"
+[1] "DNAHIV_CD4LOG"
+               SNP          gene      beta   t-stat      p-value       FDR
+10042125 rs7113204 DNAHIV_CD4LOG 0.2258044 4.833769 2.656805e-06 0.2490018
+         SequenceName Position EffectAllele AlternativeAllele
+10042125           11   500248            G                 A
+Saving 7 x 7 in image
+[1] "rs2613996"
+[1] "DNAHIV_CD4LOG"
+              SNP          gene      beta   t-stat      p-value        FDR
+5486121 rs2613996 DNAHIV_CD4LOG 0.1904706 5.205872 4.754839e-07 0.09446795
+        SequenceName Position EffectAllele AlternativeAllele
+5486121           11   470331            A                 G
+Saving 7 x 7 in image
+[1] "rs7817589"
+[1] "DNAHIV_CD4LOG"
+               SNP          gene       beta    t-stat   p-value       FDR
+11414006 rs7817589 DNAHIV_CD4LOG -0.1085692 -1.198362 0.2321872 0.9920693
+         SequenceName Position EffectAllele AlternativeAllele
+11414006            8 82154232            C                 T
+Saving 7 x 7 in image
+[1] "rs36038384"
+[1] "DNAHIV_CD4LOG"
+               SNP          gene      beta   t-stat      p-value        FDR
+6641301 rs36038384 DNAHIV_CD4LOG 0.4586317 5.227023 4.300216e-07 0.09446795
+        SequenceName  Position EffectAllele AlternativeAllele
+6641301            2 133123418            A                 G
+Saving 7 x 7 in image
+[1] "rs7113204"
+[1] "RNAHIV_CD4LOG"
+               SNP          gene        beta     t-stat   p-value       FDR
+10042126 rs7113204 RNAHIV_CD4LOG -0.01065967 -0.2217754 0.8247139 0.9991554
+         SequenceName Position EffectAllele AlternativeAllele
+10042126           11   500248            G                 A
+Saving 7 x 7 in image
+[1] "rs2613996"
+[1] "RNAHIV_CD4LOG"
+              SNP          gene       beta    t-stat   p-value       FDR
+5486119 rs2613996 RNAHIV_CD4LOG 0.01296106 0.3415144 0.7330731 0.9982771
+        SequenceName Position EffectAllele AlternativeAllele
+5486119           11   470331            A                 G
+Saving 7 x 7 in image
+[1] "rs7817589"
+[1] "RNAHIV_CD4LOG"
+               SNP          gene      beta   t-stat      p-value       FDR
+11414007 rs7817589 RNAHIV_CD4LOG 0.3187733 3.721603 0.0002569266 0.8183606
+         SequenceName Position EffectAllele AlternativeAllele
+11414007            8 82154232            C                 T
+Saving 7 x 7 in image
+[1] "rs36038384"
+[1] "RNAHIV_CD4LOG"
+               SNP          gene      beta   t-stat    p-value      FDR
+6641302 rs36038384 RNAHIV_CD4LOG 0.2186282 2.435448 0.01574541 0.977171
+        SequenceName  Position EffectAllele AlternativeAllele
+6641302            2 133123418            A                 G
+Saving 7 x 7 in image
+[1] "rs7113204"
+[1] "RNAvsDNA_CD4LOG"
+               SNP            gene       beta    t-stat      p-value        FDR
+10042124 rs7113204 RNAvsDNA_CD4LOG -0.2282932 -5.854734 1.921451e-08 0.09446795
+         SequenceName Position EffectAllele AlternativeAllele
+10042124           11   500248            G                 A
+Saving 7 x 7 in image
+[1] "rs2613996"
+[1] "RNAvsDNA_CD4LOG"
+              SNP            gene       beta    t-stat      p-value        FDR
+5486120 rs2613996 RNAvsDNA_CD4LOG -0.1650103 -5.285945 3.245298e-07 0.09446795
+        SequenceName Position EffectAllele AlternativeAllele
+5486120           11   470331            A                 G
+Saving 7 x 7 in image
+[1] "rs7817589"
+[1] "RNAvsDNA_CD4LOG"
+               SNP            gene      beta   t-stat      p-value         FDR
+11414005 rs7817589 RNAvsDNA_CD4LOG 0.4654312 6.607208 3.437091e-10 0.004413209
+         SequenceName Position EffectAllele AlternativeAllele
+11414005            8 82154232            C                 T
+Saving 7 x 7 in image
+[1] "rs36038384"
+[1] "RNAvsDNA_CD4LOG"
+               SNP            gene       beta    t-stat      p-value       FDR
+6641303 rs36038384 RNAvsDNA_CD4LOG -0.2714408 -3.497574 0.0005778972 0.8830159
+        SequenceName  Position EffectAllele AlternativeAllele
+6641303            2 133123418            A                 G
+Saving 7 x 7 in image
+There were 24 warnings (use warnings() to see them)

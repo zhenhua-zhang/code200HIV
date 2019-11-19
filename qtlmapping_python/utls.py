@@ -1,6 +1,6 @@
 # -*- UTF-8 -*-
 """Utilities for package `qtlmapping`.
-TODO: 
+TODO:
     1. move all error class into a errors.py
 """
 
@@ -13,12 +13,12 @@ import logging
 #
 log_me = logging.getLogger()
 log_me.setLevel(logging.INFO)
-ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
+stream_handler = logging.StreamHandler()
+stream_handler.setLevel(logging.INFO)
 fmtstr = "|{levelname: ^10}| {asctime} | {funcName: <20}| {message}"
-fmt = logging.Formatter(fmtstr, style="{", datefmt="%Y-%m-%d %H:%M:%S")
-ch.setFormatter(fmt)
-log_me.addHandler(ch)
+_format = logging.Formatter(fmtstr, style="{", datefmt="%Y-%m-%d %H:%M:%S")
+stream_handler.setFormatter(_format)
+log_me.addHandler(stream_handler)
 
 
 #
@@ -40,7 +40,7 @@ def setup_wd(path, override=False):
     |-- report.tsv (Not decided yet)
 
     Args:
-        path (str): The path to create the working directory. Default: ./qtlmapping_report
+        path (str; required): The path to create the working directory.
     Raises:
     Returns:
     Todos:
@@ -49,7 +49,7 @@ def setup_wd(path, override=False):
     if os.path.exists(path):
         if override:
             log_me.warn(
-                "{} exists, but will use it directly.".format(path) + 
+                "{} exists, but will use it directly.".format(path) +
                 " Start checking mandatory subdirectories"
             )
         else:
@@ -64,12 +64,12 @@ def setup_wd(path, override=False):
     ]
 
     for _dir in compulsary_dirs:
-        sub_dir = os.path.join(path, _dir) 
+        sub_dir = os.path.join(path, _dir)
         if override:
             if os.path.exists(sub_dir):
                 log_me.info("{} exists ...".format(sub_dir))
             else:
-                log_me.warn("{} doesn't exist, creating it...".format(sub_dir))
+                log_me.warning("{} doesn't exist, creating it...".format(sub_dir))
                 os.mkdir(sub_dir)
         else:
             os.mkdir(sub_dir)
@@ -91,13 +91,6 @@ def not_implemented():
     """A funnction to warn the user that the function isn't implemented and exit."""
     log_me.warn("Not implemented yet!!!!")
     sys.exit(-1)
-
-
-class UnknownCorrelationMethod(Exception):
-    pass
-
-class ArgumentDependencyError(Exception):
-    pass
 
 
 if __name__ == "__main__":

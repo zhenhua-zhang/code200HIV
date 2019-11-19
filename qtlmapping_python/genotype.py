@@ -14,6 +14,8 @@ Notes:
 TODOs:
 """
 
+import os
+import copy
 import pandas as pd
 
 from preproc import PreProc
@@ -31,7 +33,7 @@ class Genotype(PreProc):
     Notes:
     """
 
-    def __init__(self, gntp_path, gntp_ptrn="*dosage.gz", info_path=None,
+    def __init__(self, wk_dir, gntp_path, gntp_ptrn="*dosage.gz", info_path=None,
                  info_ptrn="*variantInfo.gz"):
         """Construct an Genotype instance.
 
@@ -45,13 +47,13 @@ class Genotype(PreProc):
         Todos:
             1. A regular expression could be more professional? Default: *dosage.gz
         """
-        super().__init__(gntp_path, gntp_ptrn)
+        super(Genotype, self).__init__(gntp_path, gntp_ptrn)
 
+        self.wk_dir = wk_dir
         self.info_path = info_path  # The path to the variant infomation
         self.info_ptrn = info_ptrn  # The pattern of the file names of variant information
         self.rare_vars = pd.DataFrame()
         self.gntp_dtfm = pd.DataFrame()
-        self.gntp_info_dtfm = pd.DataFrame()
 
     def load_gntp(self, **kwargs):
         """Load genotypes.
@@ -64,10 +66,13 @@ class Genotype(PreProc):
         Rturns:
             - self: the instance itself
         """
-        super().load_files(dtfm_sig="gntp", **kwargs)
+        if "dtfm_sig" not in kwargs:
+            kwargs["dtfm_sig"] = "gntp"
+
+        self.load_files(**kwargs)
         return self
 
-    def load_gntp_info(self, **kwargs):
+    def load_gtif(self, **kwargs):
         """Load genotype infomations.
 
         This is an convenient API of `PreProc.load_files()` to load information of genotype files
@@ -78,11 +83,14 @@ class Genotype(PreProc):
         Rturns:
             - self: the instance itself
         """
-        super().load_files(self.info_path, self.info_ptrn, dtfm_sig="info", **kwargs)
+        if "dtfm_sig" not in kwargs:
+            kwargs["dtfm_sig"] = "gtif"
+
+        self.load_files(self.info_path, self.info_ptrn, **kwargs)
         return self
 
     @staticmethod
-    def _encode(record, trmx):
+    def encoder(record, trmx):
         """A static method to translate dosage into genotypes.
 
         Args:
@@ -114,42 +122,25 @@ class Genotype(PreProc):
             self: the instance itself.
         Todos:
         """
+
+        log_me.info("Encode dosage into genotypes")
         target = self._wrap_into_list(target)
 
         if dosage_dtfm is None:
-            dosage_dtfm = self.get_dtfm(0, 'gntp')
+            dosage_dtfm = self.get_dtfm('gntp')
 
         if info_dtfm is None:
-            info_dtfm = self.get_dtfm(1, 'info')
+            info_dtfm = self.get_dtfm('gtif')
 
         target_inf = info_dtfm.loc[target, :]
         target_dsg = dosage_dtfm.loc[target, :]
         self.gntp_dtfm = target_dsg \
             .round() \
-            .apply(self._encode, axis=1, trmx=target_inf)
+            .apply(self.encoder, axis=1, trmx=target_inf)
 
         return self
 
-    @staticmethod
-    def _check_maf(record: pd.Series, threshold: float =0.05):
-        """Check the minor allele frequency
-        Currently only called by Genotype.mask_maf().
-
-        Args:
-            record (pandas.Series): A container include tricode-genotype to be estimated. Required
-            threshold (float): Threshold of MAF. Default: 0.05
-        Returns:
-            True / False: True if the tested MAF is smaller than threshold; False if not.
-        """
-        total_allele_n = 2 * len(record)
-        alt_allele_n = record.sum()
-
-        if threshold <= float(alt_allele_n) / total_allele_n < 1 - threshold:
-            return False
-
-        return True
-
-    def mask_maf(self, threshold: float =0.05):
+    def mask_maf(self, threshold: float = 0.05):
         """Mask out SNPs with MAF lower than given threshold.
 
         Args:
@@ -158,24 +149,38 @@ class Genotype(PreProc):
         Returns:
             self: the instance itself
         """
-        is_rare = self.wk_dtfm \
-            .round() \
-            .apply(self._check_maf, axis=1, threshold=threshold)
+        log_me.info("Mask low MAF SNPs, the threshold is {}".format(threshold))
 
-        self.rare_vars = self.wk_dtfm.loc[is_rare, :]
-        self.wk_dtfm = self.wk_dtfm.loc[~is_rare, :]
+        _, n_samples = self.wk_dtfm.shape
+        self.wk_dtfm["AAFreq"] = self.wk_dtfm.round().sum(axis=1) / (2.0 * n_samples)
+
+        is_normal = self.wk_dtfm.loc[:, "AAFreq"].between(threshold, 1 - threshold)
+
+        self.dtfm_bin["rare_vars"] = copy.deepcopy(self.wk_dtfm.loc[~is_normal, :])
+        self.wk_dtfm = self.wk_dtfm.loc[is_normal, :]
+
+        del self.wk_dtfm["AAFreq"]
 
         return self
 
-    def concat_gntp_info(self):
-        """Itegrate genotypes and information of genotype.
+    def dump_gntp(self, opt_dir=None, opt_fnm="genotypes.tsv"):
+        """Dump processed genotypes into disk."""
+        if opt_dir is None:
+            opt_dir = os.path.join(self.wk_dir, "Preprocessing")
 
-        """
-        # FIXME: Duplicated function with encode
+        log_me.info("Dump processed genotypes to {} in {}".format(opt_fnm, opt_dir))
+        self.dump_wkdtfm(opt_dir, opt_fnm)
 
-        dosage_dtfm = self.get_dtfm(0, "gntp")
-        info_dtfm = self.get_dtfm(1, "info")
-        self.gntp_info_dtfm = pd.concat([dosage_dtfm, info_dtfm], axis=1)
+        return self
+
+    def dump_rare_vars(self, opt_dir=None, opt_fnm="genotypes_rareVarsMAFle0.05.tsv"):
+        """Dump processed genotypes into disk."""
+        if opt_dir is None:
+            opt_dir = os.path.join(self.wk_dir, "Preprocessing")
+
+        log_me.info("Dump rare variants to {} in {}".format(opt_fnm, opt_dir))
+        self.set_wkdf("rare_vars")
+        self.dump_wkdtfm(opt_dir, opt_fnm)
 
         return self
 

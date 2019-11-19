@@ -1,13 +1,11 @@
 # -*- UTF-8 -*-
+"""Preprocessing phenotypes."""
 
 #
 ## phenotype.py
 #
 
-# TODO: Finish the document
 import os
-import sys
-import copy
 import math
 import json
 
@@ -15,18 +13,14 @@ from os.path import join as pjoin
 
 # Third-party
 import numpy as np
-import scipy as sp
 import pandas as pd
 import seaborn as sbn
-import matplotlib.pyplot as plt
-import scipy.cluster.hierarchy as sch
 
 from sklearn.decomposition import PCA
 
 # Local libraries
 from preproc import PreProc
 from utls import log_me, not_runnable
-from utls import UnknownCorrelationMethod
 
 
 class Phenotype(PreProc):
@@ -41,50 +35,54 @@ class Phenotype(PreProc):
         1. If there are less than three phenotypes, remove outliers by PCA isn't plausible.
     """
 
-    def __init__(self, ipt, wk_dir):
+    def __init__(self, wk_dir, pntp):
         """A class of phenotype.
 
-        Args: 
-            ipt (str): REQUIRED the path to the phenotype files. It requires in specific format, please refer the "Misc" -> "Phenotype file format" section in README for more information
+        Args:
             wk_dir (str): REQUIRED
+            pntp (str): REQUIRED the path to the phenotype files. It requires in specific format, please refer the "Misc" -> "Phenotype file format" section in README for more information
         """
-        if not (os.path.isfile(ipt) or os.path.isdir(ipt)):
-            raise TypeError("ipt should be an readable file or direcotry")
-
         if not os.path.isdir(wk_dir):
             raise TypeError("wk_dir should be a direcotry")
 
-        super().__init__(ipt)
+        if not os.path.isfile(pntp):
+            raise TypeError("pntp should be an readable file or direcotry")
+
+        super(Phenotype, self).__init__(pntp)
         self.wk_dir = wk_dir       # Working direcotry for current project
-        self.norm_plots = None     # Histgram to check the normality of each phenotype measurement
+        self.norm_plots = {}       # Histgram to check the normality of each phenotype measurement
         self.pca = None            # The result of PCA
         self.pca_plot = None       # PCA plot to show the outliers. Phenotype vector in new space could be informative
         self.safe_zone = None      # [mean - pad * std, mean + pad * std]
+        self.outlier_matrix = None       # Outliers matrix
         self.pw_corr = None        # The pairwise correlation of phenotype values
         self.pw_corr_plot = None   # Pair-wise correlation plot of phenotypes
         self.pheno_signals = None  # Phenotypes with too many repeated values
         self.pad = 0               # Padding of mean to get the safe zone
 
-    def check_norm(self):
+    def check_norm(self, signature: str):
         """Check the normality of each phenotype.
 
-        Args: None
+        Args:
+            signature (str; required): The operation signature
+
         Raises: None
         Returns:
             self: the instance itself
         Todos: this should be achieve as interactive.
         """
+        log_me.info("Check normality with signature: {}".format(signature))
         mnfl_dtfm = self.wk_dtfm.fillna(self.wk_dtfm.mean())
 
-        norm_plots = sbn.PairGrid(mnfl_dtfm)
-        norm_plots.map_upper(sbn.regplot, scatter_kws={"s": 1}, line_kws={"linewidth": 1})
-        norm_plots.map_diag(sbn.distplot)
-        norm_plots.map_lower(sbn.kdeplot)
+        norm_plot = sbn.PairGrid(mnfl_dtfm)
+        norm_plot.map_upper(sbn.regplot, scatter_kws={"s": 1}, line_kws={"linewidth": 1})
+        norm_plot.map_diag(sbn.distplot)
+        norm_plot.map_lower(sbn.kdeplot)
 
-        self.norm_plots = norm_plots
-        
+        self.norm_plots[signature] = norm_plot
+
         return self
-        
+
     def transform_by(self, func=math.log10, target=None):
         """Transform the phenotype measurement using a function (e.g. log10).
 
@@ -110,7 +108,7 @@ class Phenotype(PreProc):
 
         return self
 
-    def calc_corr(self, target=None, method="spearman", dist_mthd="ward"):
+    def calc_corr(self, target=None, method="spearman"):
         """Caluculate the correlation between phenotypes (Pairwise).
 
         Args:
@@ -122,7 +120,7 @@ class Phenotype(PreProc):
         Returns:
             self: The instance itself
         """
-        super().calc_corr(target, method, dist_mthd)
+        super().calc_corr(target, method)
         self.pw_corr_plot = sbn.clustermap(self.pw_corr)
         return self
 
@@ -149,13 +147,13 @@ class Phenotype(PreProc):
             target = self.wk_dtfm.columns
 
             if len(target) < 3:
-                log_me.warn("PCA requires > 2 features, but found {}".format(len(target)))
+                log_me.warning("PCA requires > 2 features, but found {}".format(len(target)))
                 return self
 
             self.pca = pca.fit_transform(self.wk_dtfm)
         elif isinstance(target, (list, tuple)):
             if len(target) < 3:
-                log_me.warn("PCA requires > 2 features, but found {}".format(len(target)))
+                log_me.warning("PCA requires > 2 features, but found {}".format(len(target)))
                 return self
 
             self.pca = pca.fit_transform(self.wk_dtfm.loc[:, target])
@@ -173,19 +171,18 @@ class Phenotype(PreProc):
         outlier_dtfm = pd.DataFrame(
             [
                 [sample_id[idx], x, y, False]  # Non-outliers
-                if (comp1_safe[0] < x < comp1_safe[1]) \
-                    or (comp2_safe[0] < y < comp2_safe[1])
-                else 
-                    [sample_id[idx], x, y, True]  # Outliers
+                if (comp1_safe[0] < x < comp1_safe[1]) or (comp2_safe[0] < y < comp2_safe[1])
+                else [sample_id[idx], x, y, True]  # Outliers
                 for idx, (x, y) in enumerate(zip(comp1_data, comp2_data))
             ],
             columns=["sample_id", "PC1", "PC2", "outlier"],
         ) # Outliers defined by "pad" times of standard devition
 
         grid = sbn.JointGrid(x="PC1", y="PC2", data=outlier_dtfm)
-        grid.plot_joint(sbn.scatterplot, data=outlier_dtfm,
+        grid.plot_joint(
+            sbn.scatterplot, data=outlier_dtfm,
             hue="outlier", hue_order=[True, False],
-            size="outlier", size_order=[True, False]
+            # size="outlier", size_order=[True, False]
         )
         grid.plot_marginals(sbn.distplot, kde=False, color="0.5")
 
@@ -195,7 +192,7 @@ class Phenotype(PreProc):
         )
 
         for text, x, y, is_outlier in outlier_dtfm.values:
-            if is_outlier == "Outlier":
+            if is_outlier:
                 grid.ax_joint.annotate(text, (x, y))
 
         self.pca_plot = grid
@@ -218,14 +215,14 @@ class Phenotype(PreProc):
             upper = safe_zone.loc[pheno_name, "upper"]
             return ~pheno_vals.between(lower, upper)
 
-        self.pad = 3
+        self.pad = pad
         means = self.wk_dtfm.apply(np.mean, axis=0)
         stds = self.wk_dtfm.apply(np.std, axis=0)
         lower, upper = means - pad * stds, means + pad * stds
         self.safe_zone = pd.DataFrame(dict(lower=lower, upper=upper))
 
-        outlier_matrix = self.wk_dtfm.apply(is_outlier, safe_zone=self.safe_zone)
-        self.wk_dtfm = self.wk_dtfm.mask(outlier_matrix)  
+        self.outlier_matrix = self.wk_dtfm.apply(is_outlier, safe_zone=self.safe_zone)
+        self.wk_dtfm = self.wk_dtfm.mask(self.outlier_matrix, other=by)
 
         return self
 
@@ -245,13 +242,13 @@ class Phenotype(PreProc):
         else:
             log_me.info("Will check all the phenotypes")
             pheno_mode_n = self.wk_dtfm.apply(pd.value_counts).max()
-        
+
         n_samples, _ = self.wk_dtfm.shape
         cast_phenos = pheno_mode_n[pheno_mode_n >= threshold * n_samples]
         log_me.info("Phenotypes with low signal: {}".format(", ".join(cast_phenos.index)))
 
         keep_phenos = [
-            idx for idx in self.wk_dtfm.columns 
+            idx for idx in self.wk_dtfm.columns
             if idx in set(self.wk_dtfm.columns) - set(cast_phenos.index)
         ]
 
@@ -259,15 +256,24 @@ class Phenotype(PreProc):
         self.pheno_signals = pheno_mode_n / float(n_samples)
 
         return self
-        
-    def into_report(self, dump_phenos=True, dump_ppr=True, dump_pw_corr=False):
+
+    def dump_pntp(self, opt_dir=None, opt_fnm="pheotypes.tsv"):
+        """Dump processed phenotypes into disk."""
+        if opt_dir is None:
+            opt_dir = os.path.join(self.wk_dir, "Preprocessing")
+
+        log_me.info("Dump processed genotypes to {} in {}".format(opt_fnm, opt_dir))
+        self.dump_wkdtfm(opt_dir, "phenotypes.tsv", sep="\t")
+
+        return self
+
+    def into_report(self, dump_outliers=True, dump_ppr=True, dump_pw_corr=False):
         """Write the preprocessed result and report to the disk.
 
         Args:
-            dump_phenos (bool): [False] Whether dump processed phenotype dataframe to the disk
-            dump_ppr (bool): [True] Whether dump preprocessing report into disk
-            dump_pw_corr (bool): [False] Whether dump pair-wise correlation between phenotypes to disk
-        Raises: None
+            dump_outliers (bool; optional): Whether dump outliers dataframe to the disk. Default: True
+            dump_ppr (bool; optional): Whether dump preprocessing report into disk. Default: True
+            dump_pw_corr (bool; optional): Whether dump pair-wise correlation between phenotypes to disk
         Return: None
         """
         ppr_path = pjoin(self.wk_dir, "Preprocessing")
@@ -278,19 +284,22 @@ class Phenotype(PreProc):
             self.pca_plot.savefig(path)
 
         if self.norm_plots is not None:
-            path = pjoin(ppr_path, "phenotypes_normality.pdf")
-            log_me.info("Dump histgrams of normality of each phenotype to file: {}".format(path))
-            self.norm_plots.savefig(path)
+            for _sig, _plot in self.norm_plots.items():
+                path = pjoin(ppr_path, "phenotypes_normality_{}.pdf".format(_sig))
+                log_me.info(
+                    "Dump histgrams of normality of each phenotype to file: {}".format(path)
+                )
+                _plot.savefig(path)
         
-        if dump_phenos:
-            path = pjoin(ppr_path, "phenotypes.tsv")
-            log_me.info("Dump preprocessed phenotypes to file: {}".format(path))
-            self.dump_wkdtfm(ppr_path, "phenotypes.tsv", sep="\t", discard_wkdtfm=False)
-
         if self.pw_corr_plot is not None:
             path = pjoin(ppr_path, "phenotypes_pairwise_correlation.pdf")
             log_me.info("Dump phenotypes pairwise correlation plot to file: {}".format(path))
             self.pw_corr_plot.savefig(path)
+
+        if dump_outliers:
+            path = pjoin(ppr_path, "phenotypes_outliers.tsv")
+            log_me.info("Dump phenotype outliers to file: {}".format(path))
+            self.outlier_matrix.to_csv(path, sep="\t", header=True, index=True)
 
         if dump_pw_corr:
             path = pjoin(ppr_path, "phenotypes_pairwise_correlation.tsv")
@@ -302,7 +311,7 @@ class Phenotype(PreProc):
                 "The percentage of modes in each phenotypes": self.pheno_signals.to_list(),
                 "The processed dataframe has multiple index": self.mltp_index,
                 "The {} times interval of each phenotypes".format(self.pad): self.safe_zone.to_dict(),
-                "The matrix's transposing times": self.trps_counts,
+                "The matrix's transposing times": self.trps_n,
                 "The removed 'columns'": self.rmd_cols.to_dict(),
                 "The removed 'rows'": self.rmd_rows.to_dict(),
             }
