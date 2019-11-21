@@ -1,7 +1,6 @@
 #!/usr/bin/env Rscript
 require(stringr)
 require(ggplot2)
-require(GGally)
 require(qqman)
 require(data.table)
 require(MatrixEQTL)
@@ -14,7 +13,6 @@ pppg <- function(snpid, phenotype, qtlsInformation, phenotypeLevels,
 
     print(currentQtlInfo)
     if (base::nrow(currentQtlInfo) != 0) {
-
         alternativeAllele <- currentQtlInfo[["AlternativeAllele"]]
         effectAllele <- currentQtlInfo[["EffectAllele"]]
         pValue <- currentQtlInfo[["p-value"]]
@@ -226,7 +224,7 @@ for (pm in 0:permutationTimes) {
 ## Report
 #
 qtlsFile <- paste0("~/Documents/projects/200HIV/outputs/HIVReservior/HIVReservior_AGC4nHd/qtls_hivresorvior", runFlag, ".tsv")
-qtls <- fread(qtlsFile, sep="\t", data.table = FALSE)
+qtls <- fread(qtlsFile, sep = "\t", data.table = FALSE)
 
 information_file <- "~/Documents/projects/200HIV/inputs/dosage/200HIV_dosages/variantInfo.gz"
 information <- fread(information_file, sep = " ", data.table = FALSE)
@@ -242,7 +240,9 @@ phenotypeLevelPerGenotypeSnpIds <- c("rs7113204", "rs2613996", "rs7817589")  # E
 for (phenotype in phenotypeNames) {
     qtlmappingResults <- qtlsInformation[qtlsInformation$gene == phenotype, c("SNP", "SequenceName", "Position", "p-value")]
 
-    if (nrow(qtlmappingResults) == 0) { next }
+    if (nrow(qtlmappingResults) == 0) {
+        next
+    }
 
     pdf(paste0(phenotype, "_MahattanPlot", runFlag, ".pdf"), width = 16, height = 9)
     colnames(qtlmappingResults) <- c("SNP", "CHR", "BP", "P")
