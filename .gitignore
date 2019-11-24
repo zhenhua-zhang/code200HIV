@@ -1,7 +1,6 @@
 .Rhistory
 *.gz
 *.tbi
-functions
 .vscode
 
 **/_*/
@@ -10,5 +9,4 @@ functions
 **/.*
 
 test/
-qtlmapping/seaborn_note.md
-qtlmapping/test.py
+.Rproj.user
