@@ -1,8 +1,11 @@
 #!/usr/bin/env Rscript
-# TODO: Commandline arguments to set the splitter.
+# TODO:
+#	1. Commandline arguments to set the splitter.
+#	2. Using command line argument parser instead of position arguments.
 
 library(ggplot2)
 library(stringr)
+library(optparse)
 library(reshape2)
 library(data.table)
 
@@ -13,7 +16,6 @@ args <- commandArgs(trailingOnly = TRUE)
 # args[3] target SNP
 # args[4] phenotype file
 # args[5] target phenotype
-#
 
 phenotype_file <- NULL
 target_phenotype <- NULL
@@ -26,7 +28,7 @@ if (length(args) < 2) {
 } else if (length(args) == 4) {
     target_snp <- args[3]
     phenotype_file <- args[4]
-} else if (length(args) == 5){
+} else if (length(args) == 5) {
     target_snp <- args[3]
     phenotype_file <- args[4]
     target_phenotype <- args[5]
@@ -74,7 +76,7 @@ target_snp_genotype <- sapply(
 )
 
 snp_info <- str_glue(
-    "Information SNP {target_snp}: \n  Position: chr{chrom}:{position}\n  Alleles: {effect_allele}>{alternative_allele}"
+    "Information SNP {target_snp}:\n  Position: chr{chrom}:{position}\n  Alleles: {effect_allele}>{alternative_allele}"
 )
 
 print(snp_info)
@@ -130,7 +132,6 @@ if (!is.null(phenotype_file)) {
     g <- g + labs(title = ftitle, x = xlabel, y = ylabel)
     g <- g + scale_x_discrete(labels = x_tick_lables)
 
-    
     plot_output_file <- str_glue("phenotypeLevelPerGenotype_{target_phenotype}_{target_snp}.pdf")
     ggsave(plot_output_file)
 } else {

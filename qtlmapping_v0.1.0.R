@@ -1,14 +1,20 @@
 #!/usr/bin/env Rscript
 
 # NOTE: 
-#   1. The id column is mandatory for each input file, i.e phenotypes, covariates
-#   2. For the phenotype and the covariate file, the script supposes the columns are traits, while each row represents one sample.
-#      Therefore, if the --phenotypeDataFrameTranspose or --covariateDataFrameTranspose is given, it means the input file isn't in
-#      the formated as the script supposes.
-
+#    1. The id column is mandatory for each input file, i.e phenotypes, covariates
+#    2. For the phenotype and the covariate file, the script supposes the columns are traits, while
+#    each row represents one sample. Therefore, if the --phenotypeDataFrameTranspose or
+#    --covariateDataFrameTranspose is given, it means the input file isn't in the formated as the
+#    script supposes.
 
 # TODO: 
-#   1. The format of input files
+#    1. The format of input files
+#    2. Change all variable name etc. into snake_case instead of camlCase.
+# 3. A README.md to descript this shit.
+# 4. Create a global configuration file to control options of lintr.
+
+# FIXME:
+# 1. Issue with lintr. The gitter marks are in wrong place.
 
 suppressPackageStartupMessages(library(qqman, quietly = TRUE))
 library(stringr)
@@ -20,9 +26,12 @@ library(MatrixEQTL)
 #
 ## Plot phenotype level per genotype
 #
+# TODO:
+# 	1. Need a smart implementation
+#	2. Remove this funciton and pipe it into a seperated file.
 pppg <- function(snpid, phenotype, qtlsInformation, phenotypeLevels, commonSamples, genotypeDosageRound) {
-    condition <- qtlsInformation$SNP == snpid & qtlsInformation$gene == phenotype
-    currentQtlInfo <- qtlsInformation[condition, ]
+    myConditions <- qtlsInformation$SNP == snpid & qtlsInformation$gene == phenotype
+    currentQtlInfo <- qtlsInformation[myConditions, ]
 
     print(currentQtlInfo)
     if (base::nrow(currentQtlInfo) != 0) {
@@ -57,7 +66,7 @@ pppg <- function(snpid, phenotype, qtlsInformation, phenotypeLevels, commonSampl
 
         countPerGenotype <- table(topsnpDosageRoundPhenotype[, snpid])
         genotypes <- sort(names(countPerGenotype), decreasing = (effectAllele > alternativeAllele))
-        xTickLables <- paste0(paste(genotypes, countPerGenotype, sep="("), ")")
+        xTickLables <- paste0(paste(genotypes, countPerGenotype, sep = "("), ")")
 
         x_lable <- str_glue("Genotype (P-val: {signif(pValue, 3)}; Beta: {signif(beta, 3)}; Pos: chr{chr}:{pos}; SNP: {effectAllele}>{alternativeAllele})")
         y_lable <- str_glue("Phenotype ({phenotype})")
@@ -65,7 +74,7 @@ pppg <- function(snpid, phenotype, qtlsInformation, phenotypeLevels, commonSampl
         g <- g + geom_boxplot(aes_string(x = snpid, y = phenotype, color = snpid, fill = snpid), alpha = 0.5)
         g <- g + geom_point(aes_string(x = snpid, y = phenotype))
         g <- g + scale_x_discrete(labels = xTickLables)
-        g <- g + labs(title = snpid) 
+        g <- g + labs(title = snpid)
         g <- g + xlab(x_lable)
         g <- g + ylab(y_lable)
 
@@ -75,7 +84,12 @@ pppg <- function(snpid, phenotype, qtlsInformation, phenotypeLevels, commonSampl
     }
 }
 
-transp <- function(dataframe) {
+#
+## A transpose function exploiting melt and dcast from reshape2, which doesn't ruin the data type.
+#
+# TODO:
+# 1. More arguments to control the transpose
+myTranspose <- function(dataframe) {
     newDataframe <- reshape2::dcast(reshape2::melt(dataframe), ...~id)
 
     rownames(newDataframe) <- newDataframe$variable
@@ -86,12 +100,17 @@ transp <- function(dataframe) {
     return(newDataframe)
 }
 
+#
+## Discard some columns of some data.frame
+#
 dscdCol <- function(dtfm, colToDiscard) {
-  dtfmColNames <- colnames(dtfm)
-  return(dtfm[, which(! dtfmColNames %in% colToDiscard)])
+ dtfmColNames <- colnames(dtfm)
+ return(dtfm[, which(! dtfmColNames %in% colToDiscard)])
 }
 
-# TODO: Find a better CLI parser
+#
+## Parsing CLI arguments
+#
 parser <- OptionParser(description = "A QTL mapping script based on MatrixEQTL")
 
 parser <- add_option(parser, c("-w", "--workDir"), help = "Output direcotry.", type = "character", default = "./QTL_mapping_optdir")
@@ -101,7 +120,7 @@ parser <- add_option(parser, c("--runFlag"), help = "Running flag which help to 
 parser <- add_option(parser, c("-p", "--phenotypeFile"), help = "Phenotype input file.")
 parser <- add_option(parser, c("--padding"), help = "The times of standard deviation as the boundary of outliers.", type = "integer", default = 4)
 parser <- add_option(parser, c("--phenotypesToUse"), help = "Phenotypes will be used, if more than one, using comma as delimiter.", type = "character")
-parser <- add_option(parser, c("--phenotypeDataFrameTranspose"), help = "Whether should transpose the data.frame of phenotypes.", type = "logical", action = "store_false")
+parser <- add_option(parser, c("--phenotypeDataFrameToTranspose"), help = "Whether should transpose the data.frame of phenotypes.", type = "logical", action = "store_false")
 
 # Covariates related parameters
 parser <- add_option(parser, c("-c", "--covariateFile"), help = "Covariates file.", type = "character")
@@ -116,22 +135,26 @@ parser <- add_option(parser, c("-d", "--genotypeDosageFile"), help = "Genotype d
 parser <- add_option(parser, c("-i", "--genotypeInformationFile"), help = "Genotype information file.")
 parser <- add_option(parser, c("-m", "--minorAlleleFreq"), help = "Minor allele frequency.", default = 0.05)
 
-opts <- parse_args2(parser)$options
+parser_list <- parse_args2(parser)
+args <- parser_list$args
+opts <- parser_list$options
 
 # setwd("~/Documents/projects/200HIV/outputs/HIVReservior/HIVReservior_AGC4nHd")
 # runFlag <- "_DNAandRNA_RNAvsDNA_padding4"
 workDir <- opts$workDir
 runFlag <- opts$runFlag
-
 setwd(workDir)
 
 #
 ## Visualization of the correlation of phenotypes and covariates
 #
-
 # phenotypeFile <- "~/Documents/projects/200HIV/inputs/datasets/20190524_HIVreservoir_GENT.csv"
 phenotypeFile <- opts$phenotypFile
 phenotypes <- fread(phenotypeFile, data.table = FALSE)
+
+if (opts$phenotypeDataFrameToTranspose) {
+ phenotypes <- myTranspose(phenotypes)
+}
 
 rownames(phenotypes) <- phenotypes$id
 
@@ -148,6 +171,10 @@ phenotypesChosen <- phenotypes[, c("id", phenotypesToUse)]
 # covariateFile <- "~/Documents/projects/200HIV/inputs/datasets/metaData_pcntgMnct_ssnlt_CD4CD8TC_CD4NADIR_HIVDuration_20190728.csv"
 covariateFile <- opts$covariateFile
 covariates <- fread(covariateFile, data.table = F)
+
+if (opts$covariateDataFrameToTranspose) {
+ covariates <- myTranspose(covariates)
+}
 
 rownames(covariates) <- covariates$id
 
@@ -204,7 +231,7 @@ phenotypeLogRownames <- rownames(phenotypesChosen)
 for (phenotype in phenotypesToUse) {
     outlierRowIndex <- which((lowerBound[phenotype] > phenotypesChosen[, phenotype]) | (phenotypesChosen[, phenotype] > upperBound[phenotype]))
     phenotypesChosen[outlierRowIndex, phenotype] <- NA
-    cat("For ", phenotype, " the outlier index out of ", padding, " * SD boundary [", lowerBound[phenotype], ", ", upperBound[phenotype], "]: \n  ", sep = "")
+    cat("For ", phenotype, " the outlier index out of ", padding, " * SD boundary [", lowerBound[phenotype], ", ", upperBound[phenotype], "]: \n ", sep = "")
     cat(phenotypeLogRownames[outlierRowIndex], "\n")
 }
 
@@ -236,8 +263,8 @@ covariateForME <- covariatesTransposed[c("age", "gender", "HIV_DURATION", "CD4_N
 cat("covariateForME dim:", dim(covariateForME), "\n")
 
 # Preprocessing genotypes
-# genotypeDosageFile <- "~/Documents/projects/200HIV/inputs/dosage/200HIV_dosages/chr11_200HIV_dosage.gz"  # For debugging
-# genotypeDosageFile <- "~/Documents/projects/200HIV/inputs/dosage/200HIV_dosages/chr8_200HIV_dosage.gz"  # For debugging
+# genotypeDosageFile <- "~/Documents/projects/200HIV/inputs/dosage/200HIV_dosages/chr11_200HIV_dosage.gz" # For debugging
+# genotypeDosageFile <- "~/Documents/projects/200HIV/inputs/dosage/200HIV_dosages/chr8_200HIV_dosage.gz" # For debugging
 # genotypeDosageFile <- "~/Documents/projects/200HIV/inputs/dosage/200HIV_dosages/200HIV_dosage.gz"
 genotypeDosageFile <- opts$genotypeDosageFile
 genotypeDosage <- fread(genotypeDosageFile, header = TRUE, data.table = FALSE)
@@ -246,11 +273,11 @@ rownames(genotypeDosage) <- genotypeDosage$id
 
 genotypeDosageColNames <- colnames(genotypeDosage)
 usedGenotypeDosageColNames <- genotypeDosageColNames[which(! genotypeDosageColNames %in% c("id"))]
-genotypeDosage <- genotypeDosage[, usedGenotypeDosageColNames]  # remove id
+genotypeDosage <- genotypeDosage[, usedGenotypeDosageColNames] # remove id
 
 minorAlleleFreq <- opts$minorAlleleFreq
 nSamples <- dim(genotypeDosage)[[2]]
-genotypeDosageRound <- round(genotypeDosage)  # For the phenotype level per genotype plot
+genotypeDosageRound <- round(genotypeDosage) # For the phenotype level per genotype plot
 genotypeAlleleFrequency <- apply(genotypeDosageRound, 1, sum) / (2 * nSamples)
 normalVariants <- which((genotypeAlleleFrequency >= minorAlleleFreq) & (genotypeAlleleFrequency <= 1 - minorAlleleFreq))
 
@@ -289,7 +316,7 @@ cvrt$fileOmitCharacters <- "NA" # denote missing values;
 cvrt$fileSliceSize <- 2000;
 cvrt$CreateFromMatrix(covariateMatrixForME)
 
-phenotypeMatrixForMeForPermutation <- phenotypeMatrixForME  # Matrix for the permutations operation
+phenotypeMatrixForMeForPermutation <- phenotypeMatrixForME # Matrix for the permutations operation
 useModel <- modelLINEAR
 pvOutputThreshold <- 0.999
 errorCovariance <- numeric()
@@ -340,11 +367,11 @@ genotypeInformation <- fread(genotypeInformationFile, data.table = FALSE)
 
 qtlsInformation <- merge(qtls, genotypeInformation, by.x = "SNP", by.y = "rsID")
 
-phenotypeLevelPerGenotypeThreshold <- 5e-7  # The threshold of p-value for the plot of phenotype level per genotype
+phenotypeLevelPerGenotypeThreshold <- 5e-7 # The threshold of p-value for the plot of phenotype level per genotype
 manhattanPlotThreshold <- 1e-2
 
-# phenotypeLevelPerGenotypeSnpIds <- c()  # Extra SNPs to draw the plot of phenotype level per genotype 
-phenotypeLevelPerGenotypeSnpIds <- c("rs7113204", "rs2613996", "rs7817589")  # Extra SNPs to draw the plot of phenotype level per genotype 
+# phenotypeLevelPerGenotypeSnpIds <- c() # Extra SNPs to draw the plot of phenotype level per genotype 
+phenotypeLevelPerGenotypeSnpIds <- c("rs7113204", "rs2613996", "rs7817589") # Extra SNPs to draw the plot of phenotype level per genotype 
 
 for (phenotype in phenotypesToUse) {
     qtlmappingResults <- qtlsInformation[qtlsInformation$gene == phenotype, c("SNP", "SequenceName", "Position", "p-value")]
