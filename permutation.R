@@ -3,11 +3,11 @@ library(data.table)
 library(ggplot2)
 library(gtools)
 
-# The effect allele is encoded as 1
+# The effect alleles are encoded as 2
 
-# TODO: gene-gene intercation analaysis https://journals.plos.org/plosgenetics/article?id=10.1371/journal.pgen.1001338
+# TODO: gene-gene intercation analaysis
+# https://journals.plos.org/plosgenetics/article?id=10.1371/journal.pgen.1001338
 #
-# TODO: a project
 
 
 snpid <- "rs7113204"
