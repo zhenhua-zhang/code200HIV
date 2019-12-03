@@ -7,7 +7,7 @@
 #    --covariateDataFrameTranspose is given, it means the input file isn't in the formated as the
 #    script supposes.
 
-# TODO: 
+# TODO:
 #    1. The format of input files
 #    2. Change all variable name etc. into snake_case instead of camlCase.
 # 3. A README.md to descript this shit.
