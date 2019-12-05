@@ -20,7 +20,13 @@
 #    imputation, not the category genotypes.
 #    4. If the flag --use-genotype-symbols is given, the regression will be done using
 #    genotype symbols instead of genotype dosage. And consequently, there will
-#    no genotype dodage in the work_dtfm. Will this be a problem?
+#    no genotype dodage in the work_dtfm. Will this be a problem? According to
+#    MatrixEQTL, it tests the association between each SNP and each transcript
+#    by modelling the effect of genotype as either additive linear (least
+#    squares model) or categorical (ANOVA model). Therefore, using genotype
+#    dosage in the GLM model should result consist outcomes as MatrixEQTL does.
+#    5. Perhaps a generalized additive model (GAM) helps? 为什么 QTL mapping
+#    不用更复杂的模型，比如GLM，GAM等？ additive model, least squares model?
 
 library(dplyr, warn.conflicts = FALSE, quietly = TRUE)
 library(ggplot2, warn.conflicts = FALSE, quietly = TRUE)
@@ -28,85 +34,9 @@ library(stringr, warn.conflicts = FALSE, quietly = TRUE)
 library(optparse, warn.conflicts = FALSE, quietly = TRUE)
 library(data.table, warn.conflicts = FALSE, quietly = TRUE)
 
-# A smarter read function
-smtread <- function(file_path, ..., idxc = "id", kpr = NULL, rmr = NULL, kpc = NULL, rmc = NULL,
-                    trps = FALSE) {
-    # A function to read your file smarter
-    # 1. Remove / choose columns and rows after loading the file.
-    # 2. Transform the data.frame after loading the file.
-    # 3. It does remove and choose first, and then do the transform, if all
-    #    of them are requested.
-    # 4. You also would like to give the id columns, which will help make life
-    #    easier
-
-    dtfm <- fread(
-        file_path,
-        data.table = FALSE, stringsAsFactors = FALSE, verbose = FALSE, ...
-    )
-
-    col_names <- colnames(dtfm)
-    if (idxc %in% col_names) {
-        rownames(dtfm) <- dtfm[, idxc]
-        dtfm <- dtfm[, col_names[!col_names %in% c(idxc)]]
-    } else {
-        warning("The given `idxc = ", idxc, "` is not in the column names")
-    }
-
-    if (!is.null(kpr)) {
-        kpt_rows <- kpr
-    } else {
-        kpt_rows <- rownames(dtfm)
-    }
-
-    if (!is.null(rmr)) {
-        kpt_rows <- kpt_rows[!kpt_rows %in% rmr]
-    }
-
-    if (!is.null(kpc)) {
-        kpt_cols <- kpc
-    } else {
-        kpt_cols <- colnames(dtfm)
-    }
-
-    if (!is.null(rmc)) {
-        kpt_cols <- kpt_cols[!kpt_cols %in% rmc]
-    }
-
-    if (!all(rownames(dtfm) %in% kpt_rows)) {
-        if (length(kpt_rows) > 1) {
-            dtfm <- dtfm[kpt_rows, ]
-        } else {
-            singlten <- as.list(dtfm[kpt_rows, ])
-            names(singlten) <- colnames(dtfm)
-            dtfm <- data.frame(singlten, row.names = kpt_rows)
-        }
-    }
-
-    if (!all(colnames(dtfm) %in% kpt_cols)) {
-        if (length(kpt_cols) > 1) {
-            dtfm <- dtfm[, kpt_cols]
-        } else {
-            singlten <- dtfm[, kpt_cols]
-            dtfm <- data.frame(singlten, row.names = rownames(dtfm))
-            colnames(dtfm) <- kpt_cols
-        }
-    }
-
-    if (trps) {
-        # Any is character
-        anic <- any(sapply(dtfm, function(e) {
-            return(typeof(e) == "character")
-        }))
-
-        if (anic) {
-            stop("There's character in the data.frame, plase remove them then try transform again")
-        }
-        dtfm <- as.data.frame(t(dtfm))
-    }
-
-    return(dtfm)
+if (file.exists("./utils.R")) {
+    source("./utils.R")
 }
-
 
 # << Options and flags
 parser <- OptionParser(
@@ -122,7 +52,11 @@ parser <- add_option(
 parser <- add_option(
     parser, c("--use-genotype-symbols"),
     action = "store_true", dest = "use_smb",
-    help = "Whether use genotype symbols in the regression instead of genotype dosage."
+    help = paste(
+        "Whether use genotype symbols in the regression instead of genotype dosage.",
+        "If the flag is on, the genotype will be taken as categorical variables.",
+        "Otherwise, it's additive linear."
+    )
 )
 
 parser <- add_option(
@@ -134,7 +68,7 @@ parser <- add_option(
 parser <- add_option(
     parser, c("--genotype-dosage-idx-col"),
     action = "store", dest = "genotype_dosage_idx_col", type = "character", default = "id",
-    help = "The id column in genotype file, usually its the name of column of SNP id. Default: id"
+    help = "The id column in genotype file, usually its the name of column of SNP id. Default: %default"
 )
 
 parser <- add_option(
@@ -147,11 +81,11 @@ parser <- add_option(
     parser, c("--genotype-info-cols"),
     action = "store", dest = "genotype_info_cols", type = "character",
     default = "rsID,SequenceName,Position,EffectAllele,AlternativeAllele",
-    help = "The columns will be used. Default: rsID,SequenceName,Position,EffectAllele,AlternativeAllele"
+    help = "The columns will be used. Default: %default"
 )
 
 parser <- add_option(
-    parser, c("-t", "--target-snp"),
+    parser, c("--target-snp"),
     action = "store", dest = "target_snp", type = "character",
     help = "The SNP which the phenotype level per genotype plot will be plotted."
 )
@@ -171,7 +105,7 @@ parser <- add_option(
 parser <- add_option(
     parser, c("--phenotype-idx-col"),
     action = "store", dest = "phenotype_idx_col", type = "character", default = "id",
-    help = "The id column in phenotype file"
+    help = "The id column in phenotype file. Default: %default"
 )
 
 parser <- add_option(
@@ -181,7 +115,7 @@ parser <- add_option(
 )
 
 parser <- add_option(
-    parser, c("-C", "--target-covariates"),
+    parser, c("--target-covariates"),
     action = "store", dest = "target_covariates", type = "character",
     help = "Target covariates"
 )
@@ -189,13 +123,13 @@ parser <- add_option(
 parser <- add_option(
     parser, c("--covariate-idx-col"),
     action = "store", dest = "covariate_idx_col", type = "character", default = "id",
-    help = "The id column in covariates file"
+    help = "The id column in covariates file. Default: %default"
 )
 
 parser <- add_option(
     parser, c("-O", "--output-dir"),
     action = "store", dest = "output_dir", type = "character", default = "output_dir",
-    help = "The output direcotry which will be created if not exists. Default: output_dir"
+    help = "The output direcotry which will be created if not exists. Default: %default"
 )
 
 opts_args <- parse_args2(parser)
@@ -213,6 +147,16 @@ genotype_info_file <- opts$genotype_info_file
 if (is.null(genotype_info_file)) {
     print_help(parser)
     stop("-i/--genotype-info-file is required!")
+}
+
+genotype_info_cols <- opts$genotype_info_cols
+genotype_info_cols_vec <- str_split(genotype_info_cols, pattern = ",")[[1]]
+if (length(genotype_info_cols_vec) < 5) {
+    print_help(parser)
+    stop(
+        "The length of --genotype-info-cols should be 5 and splitted by comma.\n",
+        "    e.g: rsID,SequenceName,Position,EffectAllele,AlternativeAllele"
+    )
 }
 
 target_snp <- opts$target_snp
@@ -234,16 +178,6 @@ target_snp_dosage <- genotype_dosage[target_snp, ]
 target_snp_round <- round(target_snp_dosage)
 
 #<< Add genotype information for target SNP
-genotype_info_cols <- opts$genotype_info_cols
-genotype_info_cols_vec <- str_split(genotype_info_cols, pattern = ",")[[1]]
-
-if (length(genotype_info_cols_vec) < 5) {
-    stop(
-        "The length of --genotype-info-cols should be 5 and splitted by comma.\n",
-        "    e.g: rsID,SequenceName,Position,EffectAllele,AlternativeAllele"
-    )
-}
-
 genotype_info <- smtread(genotype_info_file, idxc = genotype_info_cols_vec[1])
 target_snp_info <- genotype_info[target_snp, ]
 
@@ -255,6 +189,9 @@ alternative_allele <- target_snp_info[genotype_info_cols_vec[5]]
 effect_genotype <- paste0(effect_allele, effect_allele)
 heterozygous_genotype <- paste0(effect_allele, alternative_allele)
 alternative_genotype <- paste0(alternative_allele, alternative_allele)
+
+genotype_code_vec <- c(effect_genotype, heterozygous_genotype, alternative_genotype)
+genotype_code_num <- length(genotype_code_vec)
 
 target_snp_genotype <- sapply(
     X = target_snp_round,
@@ -299,7 +236,6 @@ if (! is.null(phenotype_file)) {
         phenotype_level <- smtread(phenotype_file, idxc = phenotype_idx_col, kpc = target_phenotypes_vec)
     }
 
-
     common_samples <- intersect(rownames(phenotype_level), genotype_sample_names)
 
     # Covariates, if given
@@ -328,14 +264,7 @@ if (! is.null(phenotype_file)) {
     for (target_phenotype in target_phenotypes_vec) {
         cat("<<< Summary for generalized linear regression for phenotype:", target_phenotype, "\n")
 
-        if (use_smb) {
-            target_snp_genotype_chosen <- target_snp_genotype[common_samples]
-            my_level <- sort(unique(target_snp_genotype_chosen), decreasing = (effect_allele > alternative_allele))
-            target_snp_genotype_chosen <- factor(target_snp_genotype_chosen, levels = my_level)
-        } else {
-            target_snp_genotype_chosen <-  target_snp_dosage[common_samples]
-        }
-
+        target_snp_genotype_chosen <-  target_snp_dosage[common_samples]
         phenotype_level_chosen <- phenotype_level[common_samples, target_phenotype]
         work_dtfm <- cbind(pntp = unlist(phenotype_level_chosen), gntp = unlist(target_snp_genotype_chosen))
 
@@ -346,16 +275,40 @@ if (! is.null(phenotype_file)) {
             work_dtfm <- as.data.frame(work_dtfm)
         }
 
+        work_dtfm["gntp_enc"] <- factor(target_snp_genotype[rownames(work_dtfm)])
 
-        glm_fit <- glm(pntp ~ ., data = work_dtfm)
+        if (use_smb) {
+            compare_table <- matrix(NA, nrow = genotype_code_num, ncol = genotype_code_num)
+            rowname_vec <- paste0("gntp_enc", genotype_code_vec)
+            rownames(compare_table) <- colnames(compare_table) <- rowname_vec
 
-        glm_fit_sum <- summary(glm_fit)
+            for (genotype_code in genotype_code_vec) {
+                work_dtfm[, "gntp_enc"] <- relevel(work_dtfm[, "gntp_enc"], ref = genotype_code)
+                glm_fit <- glm(pntp ~ . - gntp, data = work_dtfm)
+
+                glm_fit_sum <- summary(glm_fit)
+                glm_fit_coef <- glm_fit_sum$coefficient
+                baseline_rowname <- paste0("gntp_enc", genotype_code)
+                rest_rowname_vec <- rowname_vec[! rowname_vec %in% c(baseline_rowname)]
+                compare_table[rest_rowname_vec, baseline_rowname] <- glm_fit_coef[rest_rowname_vec, "Pr(>|t|)"]
+            }
+
+            rownames(compare_table) <- colnames(compare_table) <- genotype_code_vec
+            print(compare_table)
+
+            gntp_beta <- gntp_pval <- "NULL"
+        } else {
+            glm_fit <- glm(pntp ~ . - gntp_enc, data = work_dtfm)
+
+            glm_fit_sum <- summary(glm_fit)
+            gntp_pval_beta <- coef(glm_fit_sum)["gntp", c(1, 4)]
+            gntp_beta <- gntp_pval_beta[1]
+            gntp_pval <- gntp_pval_beta[2]
+        }
+
         print(glm_fit_sum)
-        cat(">>> Summary for generalized linear regression for phenotype:", target_phenotype, "\n\n\n")
 
-        work_dtfm["gntp_enc"] <- target_snp_genotype[rownames(work_dtfm)]
-        my_level <- sort(unique(work_dtfm[, "gntp_enc"]), decreasing = (effect_allele > alternative_allele))
-        work_dtfm["gntp_enc"] <- factor(work_dtfm[, "gntp_enc"], levels = my_level)
+        cat(">>> Summary for generalized linear regression for phenotype:", target_phenotype, "\n\n\n")
 
         if (scale_phenotype) {
             work_dtfm["pntp_adj"] <- scale(glm_fit$residuals[rownames(work_dtfm)])
@@ -363,22 +316,23 @@ if (! is.null(phenotype_file)) {
             work_dtfm["pntp_adj"] <- glm_fit$residuals[rownames(work_dtfm)]
         }
 
+        work_dtfm["gntp_enc"] <- factor(work_dtfm[, "gntp_enc"], levels = genotypes)
+
         # Title, x label, x ticklabel, y label
-        count_per_genotype <- table(work_dtfm["gntp_enc"]) # The genotype distribution of samples chosen for regression
-        genotypes <- sort(names(count_per_genotype), decreasing = (effect_allele > alternative_allele))
+        gntp_pval <- ifelse(is.character(gntp_pval), gntp_pval, signif(gntp_pval, 4))
+        gntp_beta <- ifelse(is.character(gntp_beta), gntp_beta, signif(gntp_beta, 4))
 
-        gntp_pval_beta <- coef(glm_fit_sum)["gntp", c(1, 4)]
-        gntp_beta <- gntp_pval_beta[1]
-        gntp_pval <- gntp_pval_beta[2]
+        xlabel <- paste0(snp_info, "; p-val: ", gntp_pval, "; beta: ", gntp_beta, 4)
 
-        ftitle <- str_glue("Phenotype level per genotype")
-        x_tick_lables <- paste0(paste(genotypes, count_per_genotype, sep = "("), ")")
-        xlabel <- paste0(snp_info, "; p-val: ", signif(gntp_pval, 4), "; beta: ", signif(gntp_beta, 4))
+        count_per_genotype <- table(work_dtfm[, "gntp_enc"])
+        x_tick_lables <- paste0(paste(genotypes, count_per_genotype[genotypes], sep = "("), ")")
+
         ylabel <- ifelse(
             is.null(target_covariates),
             str_glue("Level of {target_phenotype}"),
             str_glue("Level of {target_phenotype} adjusted by {target_covariates}")
         )
+        ftitle <- str_glue("Phenotype level per genotype")
 
         g <- ggplot(data = work_dtfm) + theme_bw()
         g <- g + geom_boxplot(aes(x = gntp_enc, y = pntp_adj, color = gntp_enc))
