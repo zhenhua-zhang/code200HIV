@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 # Create date: 2019-Nov-25
-# Last update: 2019-Dec-4
+# Last update: 2019-Dec-5
 # Version    : 0.2.0
 # Author     : Zhenhua Zhang
 # Email      : zhenhua.zhang217@gmail.com
@@ -10,15 +10,14 @@
 #    1. The id column is mandatory for each input file, i.e phenotypes, covariates
 #    2. For the phenotype and the covariate file, the script supposes the
 #    columns are traits, while each row represents one sample. Therefore, if the
-#    --phenotypeDataFrameTranspose or --covariateDataFrameTranspose is given, it
-#    means the input file isn't in the formated as the script supposes.  
+#    --trps-pntp-dtfm or --trps-cvrt-dtfm is given, it means the input file
+#    isn't in the formated as the script supposes.
 #    3. Dosage = Pr(Het|Data) + 2*Pr(Alt|Data)
+#    4. The script was developed under "R/3.5.1", under other version of R it
+#    should also function, but not been tested.
 
 # TODO:
-#    1. The format of input files
-#    2. Change all variable name etc. into snake_case instead of camlCase.
-#    3. A README.md to descript this shit.
-#    4. Create a global configuration file to control options of lintr.
+#    1. A README.md to descript this shit.
 
 # FIXME:
 #    1. Issue with lintr. The gitter marks are in wrong place. because of the
@@ -149,23 +148,28 @@ parser <- add_option(
     help = "Minor allele frequency."
 )
 
-# Misc
-parser <- add_option(
-    parser, c("--mhtn-fig-p-thrd"),
-    action = "store", dest = "mhtn_fig_p_thrd", type = "double", default = 0.05,
-    help = "The threshold of p-value for Manhattan plot. Default: 0.05"
-)
-
+# Permutations
 parser <- add_option(
     parser, c("--pm-times"),
     action = "store", dest = "pm_times", type = "integer", default = 0,
-    help = "How many times of permutations should be done. Default: 0"
+    help = paste(
+        "How many times of permutations should be done. If it's less than 1,",
+        "no permutation will be performed but only 'raw' data will be used in",
+        "the mapping. Default: 0"
+    )
 )
 
 parser <- add_option(
     parser, c("--pm-seed"),
     action = "store", dest = "pm_seed", type = "integer", default = 31415,
     help = "The random seed for permutation. Defautl: 31415"
+)
+
+# Misc
+parser <- add_option(
+    parser, c("--mhtn-fig-p-thrd"),
+    action = "store", dest = "mhtn_fig_p_thrd", type = "double", default = 0.05,
+    help = "The threshold of p-value for Manhattan plot. Default: 0.05"
 )
 
 parser <- add_option(
@@ -177,17 +181,6 @@ parser <- add_option(
 opts_args <- parse_args2(parser)
 opts <- opts_args$options
 args <- opts_args$args
-
-work_dir <- opts$work_dir
-if (! dir.exists(work_dir)) {
-    dir.create(work_dir, recursive = TRUE)
-} else {
-    warning("The given work direcotry exists, will using it directly!")
-}
-
-setwd(work_dir)
-
-run_flag <- opts$run_flag
 
 #
 ## Visualization of the correlation of phenotypes and covariates
@@ -220,6 +213,15 @@ if (length(gntp_info_cols_vec) != 5) {
     )
 }
 
+run_flag <- opts$run_flag
+work_dir <- opts$work_dir
+if (! dir.exists(work_dir)) {
+    dir.create(work_dir, recursive = TRUE)
+} else {
+    warning("The given work direcotry exists, will using it directly!")
+}
+setwd(work_dir)
+
 target_pntp <- opts$target_pntp
 target_pntp_vec <- ifelse(is.na(target_pntp), NULL, str_split(target_pntp, ",")[[1]])
 pntp_idx_col <- opts$pntp_idx_col
@@ -233,7 +235,7 @@ if (opts$trps_pntp_dtfm) {
     pntp_chosen <- smtread(pntp_file, idxc = pntp_idx_col, kpr = target_pntp_vec, trps = TRUE)
 }
 
-# Read covariates. TODO: covariates is not mandatory
+# Read covariates.
 cvrt_file <- opts$cvrt_file
 if (is.null(cvrt_file)) {
     with_cvrt <- FALSE
@@ -279,7 +281,7 @@ if (opts$draw_pwcor) {
 
 # TODO: add a section to draw heatmap of Spearman's rank correlation matrix???
 
-# Remove outliers of phenotypes 
+# Remove outliers of phenotypes
 # TODO: A CLI options to decide Whether to remove outliers or not.
 padding <- opts$padding
 phtp_means <- sapply(as.data.frame(pntp_chosen[, target_pntp]), FUN = mean, na.rm = T)

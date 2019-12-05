@@ -11,6 +11,7 @@
 
 #TODO:
 #    1. Cope with multiple target SNP.
+#    2. Covariates should be optional
 
 #NOTE:
 #    1. The effect alleles are encoded as 2
@@ -168,6 +169,8 @@ if (is.null(target_snp)) {
 output_dir <- opts$output_dir
 if (! dir.exists(output_dir)) {
     dir.create(output_dir, recursive = TRUE)
+} else {
+    warning("The given output direcotry exists, will using it directly!")
 }
 
 genotype_dosage_idx_col <- opts$genotype_dosage_idx_col
