@@ -19,12 +19,10 @@
 # TODO:
 #    1. A README.md to descript this shit.
 
-# FIXME:
-#    1. Issue with lintr. The gitter marks are in wrong place. because of the
-#    function
 
 library(qqman)
 library(stringr)
+library(GGally)
 library(ggplot2)
 library(optparse)
 library(data.table)
@@ -98,7 +96,7 @@ parser <- add_option(
 )
 
 parser <- add_option(
-    parser, c("--trps_cvrt_dtfm"),
+    parser, c("--trps-cvrt-dtfm"),
     action = "store_true", dest = "trps_cvrt_dtfm",
     help = "Whether should transpose the data.frame of covariates."
 )
@@ -173,7 +171,7 @@ parser <- add_option(
 )
 
 parser <- add_option(
-    parser, c("--draw_pwcor"),
+    parser, c("--draw-pwcor"),
     action = "store_true", dest = "draw_pwcor",
     help = "If the flag is given, the script will draw the pair-wise correlation plot for genotypes and covariates."
 )
@@ -223,10 +221,16 @@ if (! dir.exists(work_dir)) {
 setwd(work_dir)
 
 target_pntp <- opts$target_pntp
-target_pntp_vec <- ifelse(is.na(target_pntp), NULL, str_split(target_pntp, ",")[[1]])
+if (is.null(target_pntp)) {
+    target_pntp_vec <- NULL
+} else {
+    target_pntp_vec <- str_split(target_pntp, ",")[[1]]
+}
+
 pntp_idx_col <- opts$pntp_idx_col
 
-if (opts$trps_pntp_dtfm) {
+trps_pntp_dtfm <- ifelse(is.null(opts$trps_pntp_dtfm), FALSE, opts$trps_pntp_dtfm)
+if (trps_pntp_dtfm) {
     pntp_chosen <- smtread(pntp_file, idxc = pntp_idx_col, kpc = target_pntp_vec)
 } else {
     # If not transpose the data.frame, meaning the columns are samples id,
@@ -244,27 +248,37 @@ if (is.null(cvrt_file)) {
     with_cvrt <- TRUE
 
     target_cvrt <- opts$target_cvrt
-    target_cvrt_vec <- ifelse(is.na(target_cvrt), NULL, str_split(target_cvrt, ",")[[1]])
+    if (is.null(target_cvrt)) {
+        target_cvrt_vec <- NULL
+    } else {
+        target_cvrt_vec <- str_split(target_cvrt, ",")[[1]]
+    }
+
     cvrt_idx_col <- opts$cvrt_idx_col
 
-    if (opts$trps_cvrt_dtfm) {
+    trps_cvrt_dtfm <- ifelse(is.null(opts$trps_cvrt_dtfm), FALSE, opts$trps_cvrt_dtfm)
+    if (trps_cvrt_dtfm) {
         cvrt_chosen <- smtread(cvrt_file, idxc = cvrt_idx_col, kpc = target_cvrt_vec)
     } else {
         cvrt_chosen <- smtread(cvrt_file, idxc = cvrt_idx_col, kpr = target_cvrt_vec, trps = TRUE)
     }
 }
 
-if (opts$draw_pwcor) {
+# Whether do pair-wise correlation analysis for phenotypes and covariates (if
+# supplied).
+draw_pwcor <- ifelse(is.null(opts$draw_pwcor), FALSE, opts$draw_pwcor)
+if (draw_pwcor) {
     if (with_cvrt) {
-        pntp_cvrt_chosen <- pntp_chosen
-    } else {
         pntp_cvrt_chosen <- merge(pntp_chosen, cvrt_chosen, by = "row.names", all = TRUE)
-        # TODO: remove "Row.names" column??
+        rownames(pntp_cvrt_chosen) <- pntp_cvrt_chosen[, "Row.names"]
+        pntp_cvrt_chosen <- pntp_cvrt_chosen[, -1]
+    } else {
+        pntp_cvrt_chosen <- pntp_chosen
     }
 
     pwcor_trait <- opts$pwcor_trait
-    if (is.na(pwcor_trait)) {
-        pwcor_trait_vec <- rownames(pntp_cvrt_chosen)
+    if (is.null(pwcor_trait)) {
+        pwcor_trait_vec <- colnames(pntp_cvrt_chosen)
     } else {
         pwcor_trait_vec <- str_split(pwcor_trait, ",")[[1]]
     }
@@ -297,14 +311,14 @@ pntp_chosen_rownames <- rownames(pntp_chosen)
 for (pntp in target_pntp) {
     outlier_row_idx <- which((lower_bound[pntp] > pntp_chosen[, pntp]) | (pntp_chosen[, pntp] > upper_bound[pntp]))
     pntp_chosen[outlier_row_idx, pntp] <- NA
-    cat("For ", pntp, " the outlier index out of ", padding, " * SD boundary [", lower_bound[pntp], ", ", upper_bound[phenotype], "]: \n ", sep = "")
+    cat("For ", pntp, " the outlier index out of ", padding, " * SD boundary [", lower_bound[pntp], ", ", upper_bound[pntp], "]: \n ", sep = "")
     cat(pntp_chosen_rownames[outlier_row_idx], "\n")
 }
 
 ## Phenotypes
 #
 pntp_4me <- as.data.frame(t(pntp_chosen))
-rownames(pntp_4me) <- target_pntp_vec
+rownames(pntp_4me) <- colnames(pntp_chosen)
 colnames(pntp_4me) <- rownames(pntp_chosen)
 cat("Dim of phenotype data.frame will be piped into MatrixEQTL:", dim(pntp_4me), "\n")
 
@@ -312,7 +326,7 @@ cat("Dim of phenotype data.frame will be piped into MatrixEQTL:", dim(pntp_4me),
 #
 if (with_cvrt) {
     cvrt_4me <- as.data.frame(t(cvrt_chosen))
-    rownames(cvrt_4me) <- target_cvrt_vec
+    rownames(cvrt_4me) <- colnames(cvrt_chosen)
     colnames(cvrt_4me) <- rownames(cvrt_chosen)
     cat("Dim of covariate data.frame will be piped into MatrixEQTL:", dim(cvrt_4me), "\n")
 } else {
@@ -392,12 +406,12 @@ for (pm in 0:pm_times) {
 
     if (pm) {
         cat("Permuted phenotype:", pm, "\n")
-        qtls_opt_file <- str_glue("qtls_{run_flag}_permut{pm}.tsv")
+        qtls_opt_file <- as.character(str_glue("qtls_{run_flag}_permut{pm}.tsv"))
         pntp_mtrx_4me_4pm <- t(apply(pntp_mtrx_4me_4pm, 1, sample, size = n_shared_samples, replace = TRUE))
         gene$CreateFromMatrix(pntp_mtrx_4me_4pm)
     } else {
         cat("Raw phenotype\n")
-        qtls_opt_file <- str_glue("qtls_{run_flag}.tsv")
+        qtls_opt_file <- as.character(str_glue("qtls_{run_flag}.tsv"))
         gene$CreateFromMatrix(pntp_mtrx_4me)
     }
 
@@ -428,9 +442,10 @@ gntp_info_idx_col <- gntp_info_cols_vec[1]
 chrom <- gntp_info_cols_vec[2]
 position <- gntp_info_cols_vec[3]
 
-gntp_info_dtfm <- smtread(gntp_info_file, idxc = gntp_info_idx_col)
+gntp_info_dtfm <- fread(gntp_info_file, data.table = TRUE)
 qlts_info_dtfm <- merge(qtls, gntp_info_dtfm, by.x = "SNP", by.y = gntp_info_idx_col)
 
+mhtn_fig_p_thrd <- opts$mhtn_fig_p_thrd
 for (pntp in target_pntp) {
     pntp_qtls <- qlts_info_dtfm[qlts_info_dtfm$gene == pntp, c("SNP", chrom, position, "p-value")]
 
