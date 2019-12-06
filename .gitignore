@@ -1,12 +1,7 @@
-.Rhistory
-*.gz
-*.tbi
-.vscode
-
 **/_*/
 
 .*
 **/.*
 
-test/
-.Rproj.user
+*.gz
+*.tbi
