@@ -16,6 +16,6 @@ A wrapper of MatrixEQTL and some post-mapping scripts
 ## TODO
 
 ## Licence
-Ai gan ma gan ma.
-爱 干  嘛 干  嘛。
-Do anything you want with it.
+Ai gan ma gan ma.  
+爱 干  嘛 干  嘛。  
+Do anything you want with it.  
