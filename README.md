@@ -1,8 +1,13 @@
-# qtlmapping
+qtlmapping
+===
+
 
 Introduction
 ---
-A wrapper of MatrixEQTL and some post-mapping scripts. All the scripts are written to analyze the latent HIV reservoir in 200 HIV project. However, it should work for other dataset.
+A wrapper of `MatrixEQTL` and some post-mapping scripts. All the scripts are
+written to analyze the latent HIV reservoir in 200 HIV project. However, it
+should work for other dataset.
+
 
 Dependencies
 ---
@@ -31,6 +36,9 @@ Rscript ./qtlmapping_v0.2.0.R \
 ```
 
 **Help**  
+The help here could be out of date, as the scripts could be updated frequently
+while the `README.md` isn't.
+
 ``` {bash}
 Usage: qtlmapping_v0.2.0.R [options]
 A QTL mapping script based on MatrixEQTL
@@ -116,14 +124,20 @@ Options:
                 correlation plot for genotypes and covariates.
 ```
 
+
 Notice
 ---
 
+
 To-do list
 ---
+- [ ] Make it into a R package
+- [ ] Do permutation by multiple threads
+- [ ] Add more details to the Usage.Help section
+
 
 Licence
 ---
 
-`爱(ài)干(gàn)嘛(má)干(gàn)嘛(má)`  
-Do anything you want with it.
+`爱(ài)干(gàn)嘛(má)干(gàn)嘛(má)。如果非得要就用MIT就行。`  
+Do anything you want with it. If you insist, please use MIT one.
