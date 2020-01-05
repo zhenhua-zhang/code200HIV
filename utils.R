@@ -91,3 +91,15 @@ smtread <- function(file_path, ..., idxc = "id", kpr = NULL, rmr = NULL, kpc = N
 
     return(dtfm)
 }
+
+lambda <- function(stvc, sttp="PVAL", rnd=3) {
+    if(sttp == "Z") {
+        z = stvc
+    } else if (sttp == "CHISQ") {
+        z = sqrt(stvc)
+    } else if (sttp == "PVAL") {
+        z = qnorm(stvc / 2)
+    }
+
+    return(round(median(z^2) / qchisq(0.5, 1), rnd))
+}

@@ -1,8 +1,9 @@
 #!/usr/bin/env Rscript
 
 # Create date: 2019-Nov-25
-# Last update: 2019-Dec-5
+# Last update: Mon 30 Dec 2019 11:18:41 AM CET
 # Version    : 0.2.0
+# License    : MIT
 # Author     : Zhenhua Zhang
 # Email      : zhenhua.zhang217@gmail.com
 
@@ -298,17 +299,17 @@ if (draw_pwcor) {
 # Remove outliers of phenotypes
 # TODO: A CLI options to decide Whether to remove outliers or not.
 padding <- opts$padding
-phtp_means <- sapply(as.data.frame(pntp_chosen[, target_pntp]), FUN = mean, na.rm = T)
-pntp_sd <- sapply(as.data.frame(pntp_chosen[, target_pntp]), FUN = sd, na.rm = T)
+pntp_means <- sapply(as.data.frame(pntp_chosen[, target_pntp_vec]), FUN = mean, na.rm = T)
+pntp_sd <- sapply(as.data.frame(pntp_chosen[, target_pntp_vec]), FUN = sd, na.rm = T)
 
-upper_bound <- phtp_means + padding * pntp_sd
-lower_bound <- phtp_means - padding * pntp_sd
+upper_bound <- pntp_means + padding * pntp_sd
+lower_bound <- pntp_means - padding * pntp_sd
 
-names(upper_bound) <- target_pntp
-names(lower_bound) <- target_pntp
+names(upper_bound) <- target_pntp_vec
+names(lower_bound) <- target_pntp_vec
 
 pntp_chosen_rownames <- rownames(pntp_chosen)
-for (pntp in target_pntp) {
+for (pntp in target_pntp_vec) {
     outlier_row_idx <- which((lower_bound[pntp] > pntp_chosen[, pntp]) | (pntp_chosen[, pntp] > upper_bound[pntp]))
     pntp_chosen[outlier_row_idx, pntp] <- NA
     cat("For ", pntp, " the outlier index out of ", padding, " * SD boundary [", lower_bound[pntp], ", ", upper_bound[pntp], "]: \n ", sep = "")
@@ -357,7 +358,7 @@ if (with_cvrt) {
 
     # Write the covariates which are used in the QTL mapping into disk.
     cvrt_mtrx_4me <- as.matrix(cvrt_4me[, shared_samples])
-    fwrite(cvrt_4me[, shared_samples], file = str_glue("covariates_fedtoMatrixEQTL{run_flag}.tsv"), sep = "\t", row.names = TRUE, col.names = TRUE)
+    fwrite(cvrt_4me[, shared_samples], file = str_glue("covariates_fedtoMatrixEQTL_{run_flag}.tsv"), sep = "\t", row.names = TRUE, col.names = TRUE)
 
     # nolint start
     cvrt <- SlicedData$new()
@@ -374,7 +375,7 @@ n_shared_samples <- length(shared_samples)
 cat("Samples (", n_shared_samples, ") will be fed to MatrixEQTL:", shared_samples, "\n")
 
 pntp_mtrx_4me <- as.matrix(pntp_4me[, shared_samples])
-fwrite(pntp_4me[, shared_samples], file = str_glue("phenotypes_fedtoMatrixEQTL{run_flag}.tsv"), sep = "\t", row.names = TRUE, col.names = TRUE)
+fwrite(pntp_4me[, shared_samples], file = str_glue("phenotypes_fedtoMatrixEQTL_{run_flag}.tsv"), sep = "\t", row.names = TRUE, col.names = TRUE)
 
 gntp_mtrx_4me <- as.matrix(gntp_4me[, shared_samples])
 
@@ -390,7 +391,7 @@ snps$CreateFromMatrix(gntp_mtrx_4me)
 
 pntp_mtrx_4me_4pm <- pntp_mtrx_4me # Matrix for the permutations operation
 use_model <- MatrixEQTL::modelLINEAR
-pv_opt_thrd <- 0.999
+pv_opt_thrd <- 0.9999  # TODO: add a CLI option for it
 err_cov <- numeric()
 
 pm_seed <- opts$pm_seed
@@ -446,11 +447,19 @@ gntp_info_dtfm <- fread(gntp_info_file, data.table = TRUE)
 qlts_info_dtfm <- merge(qtls, gntp_info_dtfm, by.x = "SNP", by.y = gntp_info_idx_col)
 
 mhtn_fig_p_thrd <- opts$mhtn_fig_p_thrd
-for (pntp in target_pntp) {
+for (pntp in target_pntp_vec) {
     pntp_qtls <- qlts_info_dtfm[qlts_info_dtfm$gene == pntp, c("SNP", chrom, position, "p-value")]
 
     if (nrow(pntp_qtls) > 0) {
         colnames(pntp_qtls) <- c("SNP", "CHR", "BP", "P")
+
+        if (pv_opt_thrd < 0.9999) {
+            lmb <- "NULL"
+        } else {
+            lmb <- lambda(pntp_qtls$P, "PVAL")
+        }
+
+        cat(str_glue("Inflation factor for {pntp}: {lmb}"), "\n")
         pdf(str_glue("MahattanPlot_{pntp}_{run_flag}.pdf"), width = 16, height = 9)
         manhattan(
             pntp_qtls[pntp_qtls[, "P"] <= mhtn_fig_p_thrd, ],
@@ -459,7 +468,7 @@ for (pntp in target_pntp) {
         dev.off()
 
         pdf(str_glue("QQPlot_{pntp}_{run_flag}.pdf"), width = 16, height = 16)
-        qq(pntp_qtls$P, main = str_glue("Q-Q plot {pntp}"), pch = 18, cex = 1, las = 1)
+        qq(pntp_qtls$P, main = str_glue("Q-Q plot {pntp} (lambda={lmb})"), pch = 18, cex = 1, las = 1)
         dev.off()
     } else {
         warning(str_glue("No QTL is found under p value ({pv_opt_thrd}) for {pntp} (trait or gene)"))
