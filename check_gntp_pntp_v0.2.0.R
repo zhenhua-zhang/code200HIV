@@ -133,6 +133,7 @@ parser <- add_option(
     help = "The output direcotry which will be created if not exists. Default: %default"
 )
 
+
 opts_args <- parse_args2(parser)
 opts <- opts_args$options
 args <- opts_args$args
@@ -164,6 +165,10 @@ target_snp <- opts$target_snp
 if (is.null(target_snp)) {
     print_help(parser)
     stop("-t/--target-snp is required!")
+} else if (grepl(",", target_snp)) {
+    target_snp_vec <- str_split(target_snp, ",")[[1]]
+} else {
+    target_snp_vec <- c(target_snp)
 }
 
 output_dir <- opts$output_dir
@@ -173,62 +178,22 @@ if (! dir.exists(output_dir)) {
     warning("The given output direcotry exists, will using it directly!")
 }
 
+#
+## Genotypes
+#
 genotype_dosage_idx_col <- opts$genotype_dosage_idx_col
 genotype_dosage <- smtread(genotype_dosage_file, idxc = genotype_dosage_idx_col)
 genotype_sample_names <- colnames(genotype_dosage)
-
-target_snp_dosage <- genotype_dosage[target_snp, ]
-target_snp_round <- round(target_snp_dosage)
-
-#<< Add genotype information for target SNP
 genotype_info <- smtread(genotype_info_file, idxc = genotype_info_cols_vec[1])
-target_snp_info <- genotype_info[target_snp, ]
-
-chrom <- target_snp_info[genotype_info_cols_vec[2]]
-position <- target_snp_info[genotype_info_cols_vec[3]]
-effect_allele <- target_snp_info[genotype_info_cols_vec[4]]
-alternative_allele <- target_snp_info[genotype_info_cols_vec[5]]
-
-effect_genotype <- paste0(effect_allele, effect_allele)
-heterozygous_genotype <- paste0(effect_allele, alternative_allele)
-alternative_genotype <- paste0(alternative_allele, alternative_allele)
-
-genotype_code_vec <- c(effect_genotype, heterozygous_genotype, alternative_genotype)
-genotype_code_num <- length(genotype_code_vec)
-
-target_snp_genotype <- sapply(
-    X = target_snp_round,
-    FUN = function(e) {
-        if (e == 0) {
-            return(alternative_genotype)
-        } else if (e == 1) {
-            return(heterozygous_genotype)
-        } else if (e == 2) {
-            return(effect_genotype)
-        } else {
-            return(NULL)
-        }
-    }
-)
-# Add genotype information for target SNP >>
-
-count_per_genotype <- table(target_snp_genotype)
-genotypes <- sort(names(count_per_genotype), decreasing = (effect_allele > alternative_allele))
-genotype_freq <- paste0(paste(genotypes, count_per_genotype[genotypes], sep = "("), ")")
-snp_info <- str_glue("SNP: {target_snp};", " Chr: {chrom};", " Pos: {position};", " Var: {effect_allele}>{alternative_allele}")
-cat("<<<\n", snp_info, "; Genotype freq: ", paste(genotype_freq), "\n>>>\n", sep = "")
 
 #
-## Phenotype level per genotype plot, with correction for covariates
+## Phenotypes
 #
 phenotype_file <- opts$phenotype_file
 phenotype_idx_col <- opts$phenotype_idx_col
 target_phenotypes <- opts$target_phenotypes
 
-covariate_file <- opts$covariate_file
-covariate_idx_col <- opts$covariate_idx_col
-target_covariates <- opts$target_covariates
-
+common_samples <- NULL
 if (! is.null(phenotype_file)) {
     # Phenotype level
     if (is.null(target_phenotypes)) {
@@ -238,38 +203,88 @@ if (! is.null(phenotype_file)) {
         target_phenotypes_vec <- str_split(target_phenotypes, pattern = ",")[[1]]
         phenotype_level <- smtread(phenotype_file, idxc = phenotype_idx_col, kpc = target_phenotypes_vec)
     }
-
     common_samples <- intersect(rownames(phenotype_level), genotype_sample_names)
+}
 
-    # Covariates, if given
-    if (! is.null(covariate_file)) {
-        if (is.null(target_covariates)) {
-            covariate_level <- smtread(covariate_file, idxc = covariate_idx_col)
-            target_covariates_vec <- colnames(covariate_level)
-        } else {
-            target_covariates_vec <- str_split(target_covariates, pattern = ",")[[1]]
-            covariate_level <- smtread(covariate_file, idxc = covariate_idx_col, kpc = target_covariates_vec)
-        }
+#
+## Covariates
+#
+covariate_file <- opts$covariate_file
+covariate_idx_col <- opts$covariate_idx_col
+target_covariates <- opts$target_covariates
 
-        common_samples <- intersect(common_samples, rownames(covariate_level))
-
-        if (length(target_covariates_vec) > 1) {
-            covariate_level_chosen <- covariate_level[common_samples, ]
-        } else {
-            covariate_level_chosen <- unlist(covariate_level[common_samples, ])
-        }
+if (! is.null(covariate_file)) {
+    if (is.null(target_covariates)) {
+        covariate_level <- smtread(covariate_file, idxc = covariate_idx_col)
+        target_covariates_vec <- colnames(covariate_level)
     } else {
-        covariate_level_chosen <- NULL
+        target_covariates_vec <- str_split(target_covariates, pattern = ",")[[1]]
+        covariate_level <- smtread(covariate_file, idxc = covariate_idx_col, kpc = target_covariates_vec)
     }
 
-    use_smb <- ifelse(is.null(opts$use_smb), FALSE, opts$use_smb)
-    scale_phenotype <- ifelse(is.null(opts$scale_phenotype), FALSE, opts$scale_phenotype)
-    for (target_phenotype in target_phenotypes_vec) {
-        cat("<<< Summary for generalized linear regression for phenotype:", target_phenotype, "\n")
+    common_samples <- intersect(common_samples, rownames(covariate_level))
 
-        target_snp_genotype_chosen <-  target_snp_dosage[common_samples]
+    if (length(target_covariates_vec) > 1) {
+        covariate_level_chosen <- covariate_level[common_samples, ]
+    } else {
+        covariate_level_chosen <- unlist(covariate_level[common_samples, ])
+    }
+} else {
+    covariate_level_chosen <- NULL
+}
+
+use_smb <- ifelse(is.null(opts$use_smb), FALSE, opts$use_smb)
+scale_phenotype <- ifelse(is.null(opts$scale_phenotype), FALSE, opts$scale_phenotype)
+
+for (target_snp in target_snp_vec) {
+    output_file <- str_glue("{output_dir}/check_gntp_pntp_{target_snp}.txt" )
+
+    capture.output(cat(str_glue("Number of samples in common: {length(common_samples)}")), file = output_file, append = TRUE)
+
+    target_snp_dosage <- genotype_dosage[target_snp, ]
+    target_snp_round <- round(target_snp_dosage)
+
+    target_snp_info <- genotype_info[target_snp, ]
+
+    chrom <- target_snp_info[genotype_info_cols_vec[2]]
+    position <- target_snp_info[genotype_info_cols_vec[3]]
+    effect_allele <- target_snp_info[genotype_info_cols_vec[4]]
+    alternative_allele <- target_snp_info[genotype_info_cols_vec[5]]
+
+    effect_genotype <- paste0(effect_allele, effect_allele)
+    heterozygous_genotype <- paste0(effect_allele, alternative_allele)
+    alternative_genotype <- paste0(alternative_allele, alternative_allele)
+
+    genotype_code_vec <- c(effect_genotype, heterozygous_genotype, alternative_genotype)
+    genotype_code_num <- length(genotype_code_vec)
+
+    target_snp_genotype <- sapply(
+      X = target_snp_round,
+      FUN = function(e) {
+          if (e == 0) {
+              return(alternative_genotype)
+          } else if (e == 1) {
+              return(heterozygous_genotype)
+          } else if (e == 2) {
+              return(effect_genotype)
+          } else {
+              return(NULL)
+          }
+      }
+    )
+
+    count_per_genotype <- table(target_snp_genotype)
+    genotypes <- sort(names(count_per_genotype), decreasing = (effect_allele > alternative_allele))
+    genotype_freq <- paste0(paste(genotypes, count_per_genotype[genotypes], sep = "("), ")")
+    snp_info <- str_glue("SNP: {target_snp};", " Chr: {chrom};", " Pos: {position};", " Var: {effect_allele}>{alternative_allele}")
+    capture.output(cat("<<<\n", snp_info, "; Genotype freq: ", paste(genotype_freq), "\n>>>\n", sep = ""), file = output_file, append = TRUE)
+
+    for (target_phenotype in target_phenotypes_vec) {
+        capture.output(cat("<<< Summary for generalized linear regression for phenotype:", target_phenotype, "\n"), file = output_file, append = TRUE)
+
+        genotype_level_chosen <-  target_snp_dosage[common_samples]
         phenotype_level_chosen <- phenotype_level[common_samples, target_phenotype]
-        work_dtfm <- cbind(pntp = unlist(phenotype_level_chosen), gntp = unlist(target_snp_genotype_chosen))
+        work_dtfm <- cbind(pntp = unlist(phenotype_level_chosen), gntp = unlist(genotype_level_chosen))
 
         if (! is.null(covariate_level_chosen)) {
             work_dtfm <- as.data.frame(cbind(work_dtfm, covariate_level_chosen))
@@ -297,7 +312,7 @@ if (! is.null(phenotype_file)) {
             }
 
             rownames(compare_table) <- colnames(compare_table) <- genotype_code_vec
-            print(compare_table)
+            capture.output(print(compare_table), file = output_file, append = TRUE)
 
             gntp_beta <- gntp_pval <- "NULL"
         } else {
@@ -309,9 +324,8 @@ if (! is.null(phenotype_file)) {
             gntp_pval <- gntp_pval_beta[2]
         }
 
-        print(glm_fit_sum)
-
-        cat(">>> Summary for generalized linear regression for phenotype:", target_phenotype, "\n\n\n")
+        capture.output(print(glm_fit_sum), file = output_file, append = TRUE)
+        capture.output(cat(">>> Summary for generalized linear regression for phenotype:", target_phenotype, "\n\n\n"), file = output_file, append = TRUE)
 
         if (scale_phenotype) {
             work_dtfm["pntp_adj"] <- scale(glm_fit$residuals[rownames(work_dtfm)])
@@ -331,9 +345,9 @@ if (! is.null(phenotype_file)) {
         x_tick_lables <- paste0(paste(genotypes, count_per_genotype[genotypes], sep = "("), ")")
 
         ylabel <- ifelse(
-            is.null(target_covariates),
-            str_glue("Level of {target_phenotype}"),
-            str_glue("Level of {target_phenotype} adjusted by {target_covariates}")
+             is.null(target_covariates),
+             str_glue("Level of {target_phenotype}"),
+             str_glue("Level of {target_phenotype} adjusted by {target_covariates}")
         )
         ftitle <- str_glue("Phenotype level per genotype")
 
@@ -345,9 +359,7 @@ if (! is.null(phenotype_file)) {
         g <- g + theme(plot.title = element_text(hjust = 0.5))
 
         opt_path <- str_glue("{output_dir}/phenotypeLevelPerGenotype_{target_phenotype}_{target_snp}.pdf")
-        ggsave(opt_path, width = 10, height = 10)
-        cat("\n----------------------------------------------------------------------------\n")
+        ggsave(opt_path, g, width = 10, height = 10)
+        capture.output(cat("\n----------------------------------------------------------------------------\n"), file = output_file, append = TRUE)
     }
-} else {
-    warning("No phenotype is given, skipping draw phenotype level per genotype plot...")
 }
