@@ -179,11 +179,7 @@ parser <- add_option(
 
 opts_args <- parse_args2(parser)
 opts <- opts_args$options
-args <- opts_args$args
 
-#
-## Visualization of the correlation of phenotypes and covariates
-#
 pntp_file <- opts$pntp_file
 if (is.null(pntp_file)) {
     print_help(parser)
@@ -265,6 +261,9 @@ if (is.null(cvrt_file)) {
     }
 }
 
+#
+## Visualization of the correlation of phenotypes and covariates
+#
 # Whether do pair-wise correlation analysis for phenotypes and covariates (if
 # supplied).
 draw_pwcor <- ifelse(is.null(opts$draw_pwcor), FALSE, opts$draw_pwcor)
