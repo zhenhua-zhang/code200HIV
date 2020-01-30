@@ -16,14 +16,17 @@
 #    3. Dosage = Pr(Het|Data) + 2*Pr(Alt|Data)
 #    4. The script was developed under "R/3.5.1", under other version of R it
 #    should also function, but not been tested.
+#    5. For permutation test, the genotype should be shuffled simouteniously
+#    with covariates.
 
 # TODO:
 #    1. A README.md to descript this shit.
 
 
 library(qqman)
-library(stringr)
+library(pbdMPI)
 library(GGally)
+library(stringr)
 library(ggplot2)
 library(optparse)
 library(data.table)
@@ -138,7 +141,10 @@ parser <- add_option(
     parser, c("--gntp-info-cols"),
     action = "store", dest = "gntp_info_cols", type = "character",
     default = "rsID,SequenceName,Position,EffectAllele,AlternativeAllele",
-    help = "The columns will be used. Default: rsID,SequenceName,Position,EffectAllele,AlternativeAllele"
+    help = paste(
+        "The columns will be used.", 
+        "Default: rsID,SequenceName,Position,EffectAllele,AlternativeAllele"
+    )
 )
 
 parser <- add_option(
@@ -163,6 +169,13 @@ parser <- add_option(
     action = "store", dest = "pm_seed", type = "integer", default = 31415,
     help = "The random seed for permutation. Defautl: 31415"
 )
+
+parser <- add_option(
+    parser, c("--pm-threads"),
+    action = "store", dest = "pm_threads", type = "integer", default = 1,
+    help = "The number of threads used in permutations. Default: 1"
+)
+
 
 # Misc
 parser <- add_option(
@@ -406,12 +419,20 @@ for (pm in 0:pm_times) {
 
     if (pm) {
         cat("Permuted phenotype:", pm, "\n")
-        qtls_opt_file <- as.character(str_glue("qtls_{run_flag}_permut{pm}.tsv"))
-        pntp_mtrx_4me_4pm <- t(apply(pntp_mtrx_4me_4pm, 1, sample, size = n_shared_samples, replace = TRUE))
+        qtls_opt_file <- NULL
+        noFDRsaveMemory <- FALSE
+        shuffled_samples <- sample(x = shared_samples, size = n_shared_samples, replace = FALSE)
+        pntp_mtrx_4me_4pm <- pntp_mtrx_4me[, shuffled_samples]
         gene$CreateFromMatrix(pntp_mtrx_4me_4pm)
+
+        if (!is.null(cvrt)) {
+            cvrt_mtrx_4me_4pm <- cvrt_mtrx_4me[, shuffled_samples]
+            cvrt$CreateFromMatrix(cvrt_mtrx_4me_4pm)
+        }
     } else {
         cat("Raw phenotype\n")
         qtls_opt_file <- as.character(str_glue("qtls_{run_flag}.tsv"))
+        noFDRsaveMemory <- TRUE
         gene$CreateFromMatrix(pntp_mtrx_4me)
     }
 
@@ -423,11 +444,28 @@ for (pm in 0:pm_times) {
         pvOutputThreshold = pv_opt_thrd,
         useModel = use_model,
         errorCovariance = err_cov,
-        verbose = TRUE,
-        pvalue.hist = TRUE,
-        min.pv.by.genesnp = FALSE,
-        noFDRsaveMemory = FALSE
+        verbose = FALSE,
+        pvalue.hist = FALSE,
+        min.pv.by.genesnp = TRUE,
+        noFDRsaveMemory = noFDRsaveMemory
     )
+
+    genePermutationFileName <- str_glue("qtls_{run_flag}_genePermutationMinPvals.tsv")
+    if (pm == 0) {
+        min_gene_pv_dtfm <- as.data.frame(t(me$all$min.pv.gene))
+        rownames(min_gene_pv_dtfm) <- "raw"
+        fwrite(
+            min_gene_pv_dtfm, file = genePermutationFileName,
+            showProgress = F, row.names = T
+        )
+    } else {
+        min_gene_pv_dtfm <- as.data.frame(t(me$all$min.pv.gene))
+        rownames(min_gene_pv_dtfm) <- paste0("pm", pm)
+        fwrite(
+            min_gene_pv_dtfm, file = genePermutationFileName,
+            append = T, showProgress = F, row.names = T, col.names = F
+        )
+    }
 }
 
 #
@@ -436,6 +474,7 @@ for (pm in 0:pm_times) {
 
 # NOTE: There're repeated SNP IDs in the QTL mapping results due to multiple
 # phentoypes (or genes), while the smtread() isn't smart enough to handle it.
+qtls_opt_file <- as.character(str_glue("qtls_{run_flag}.tsv"))
 qtls <- fread(qtls_opt_file, data.table = FALSE)
 
 gntp_info_idx_col <- gntp_info_cols_vec[1]
