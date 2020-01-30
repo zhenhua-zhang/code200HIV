@@ -347,9 +347,9 @@ for (target_snp in target_snp_vec) {
         ylabel <- ifelse(
              is.null(target_covariates),
              str_glue("Level of {target_phenotype}"),
-             str_glue("Level of {target_phenotype} adjusted by {target_covariates}")
+             str_glue("Level of ({target_phenotype} | {target_covariates})")
         )
-        ftitle <- str_glue("Phenotype level per genotype")
+        ftitle <- str_glue("Boxplot for {target_snp} x {target_phenotype}")
 
         g <- ggplot(data = work_dtfm) + theme_bw()
         g <- g + geom_boxplot(aes(x = gntp_enc, y = pntp_adj, color = gntp_enc))
@@ -358,7 +358,7 @@ for (target_snp in target_snp_vec) {
         g <- g + scale_x_discrete(labels = x_tick_lables)
         g <- g + theme(plot.title = element_text(hjust = 0.5))
 
-        opt_path <- str_glue("{output_dir}/phenotypeLevelPerGenotype_{target_phenotype}_{target_snp}.pdf")
+        opt_path <- str_glue("{output_dir}/boxplot_{target_phenotype}_{target_snp}.pdf")
         ggsave(opt_path, g, width = 10, height = 10)
         capture.output(cat("\n----------------------------------------------------------------------------\n"), file = output_file, append = TRUE)
     }

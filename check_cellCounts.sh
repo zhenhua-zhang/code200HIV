@@ -23,11 +23,13 @@ covariate_file=${i_dir}/datasets/metaData_pcntgMnct_ssnlt_CD4CD8TC_CD4NADIR_HIVD
 target_covariates=age,gender,CD4_NADIR,HIV_DURATION
 
 top_snp=rs7113204
-if [ $top_snp == "rs7817589" ]; then # rs7817589 p-vaue < 5e-7
-    target_snp=rs7817589,rs4739797,rs1834712,rs4523210,rs10504736,rs4357250,rs7818093,rs9298346,rs1427075,rs6473264,rs12542001,rs1427073,rs1863648,rs2081675,rs7015085,rs10958004,rs12548276
-elif [ $top_snp == "rs7113204" ]; then #rs7113204 p-value < 4e-7
-    target_snp=rs7113204,rs12576389,rs7396778,rs146730949,rs12577368,rs6598020,rs113061269,rs55768561,rs72851107,rs7110722,rs2613996,rs56356502,rs111512069,rs11827672,rs67092853
-fi
+# if [ $top_snp == "rs7817589" ]; then # rs7817589 p-vaue < 5e-7
+#     target_snp=rs7817589,rs4739797,rs1834712,rs4523210,rs10504736,rs4357250,rs7818093,rs9298346,rs1427075,rs6473264,rs12542001,rs1427073,rs1863648,rs2081675,rs7015085,rs10958004,rs12548276
+# elif [ $top_snp == "rs7113204" ]; then #rs7113204 p-value < 4e-7
+#     target_snp=rs7113204,rs12576389,rs7396778,rs146730949,rs12577368,rs6598020,rs113061269,rs55768561,rs72851107,rs7110722,rs2613996,rs56356502,rs111512069,rs11827672,rs67092853
+# fi
+
+target_snp=rs7817589
 
 # Outputs
 output_dir=${o_dir}/HIVReservior/cellCountsAnalysis/$top_snp
