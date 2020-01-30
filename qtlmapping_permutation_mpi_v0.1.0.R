@@ -18,6 +18,10 @@
 #    should also function, but not been tested.
 #    5. For permutation test, the genotype should be shuffled simouteniously
 #    with covariates.
+#    6. Because R limits the each demision of a metrices up to 2^31-1, it's not
+#    possbile to do permutation using all SNPS, if you want to exploit pbdMPI.
+#    7. This script is meant to do permutation test, if your results are good
+#    enough, you don't need it
 
 # TODO:
 #    1. A README.md to descript this shit.
@@ -45,9 +49,6 @@ get_args <- function() {
     parser <- add_option(parser, c("--trps-cvrt-dtfm"), action = "store_true", dest = "trps_cvrt_dtfm", help = "Whether should transpose the data.frame of covariates.")
     parser <- add_option(parser, c("--cvrt-idx-col"), action = "store", dest = "cvrt_idx_col", type = "character", default = "id", help = "The id column in covariates file")
 
-    # Phenotypes and covariates correlation
-    parser <- add_option(parser, c("-t", "--pwcor-trait"), action = "store", dest = "pwcor_trait", type = "character", help = "Traits will be correlated with in paire-wised way. The options will be ignored if --draw-pwcor isn't given.")
-
     # Genotypes related parameters
     parser <- add_option(parser, c("-d", "--gntp-dosage-file"), action = "store", dest = "gntp_dosage_file", type = "character", help = "The genotype dosage file (could be compressed).")
     parser <- add_option(parser, c("--genotype-dosage-idx-col"), action = "store", dest = "gntp_dosage_idx_col", type = "character", default = "id", help = "The id column in genotype file, usually its the name of column of SNP id. Default: id")
@@ -58,10 +59,6 @@ get_args <- function() {
     # Permutations
     parser <- add_option(parser, c("--pm-times"), action = "store", dest = "pm_times", type = "integer", default = 0, help = "How many times of permutations should be done. If it's less than 1, no permutation will be performed but only 'raw' data will be used in the mapping. Default: 0") 
     parser <- add_option(parser, c("--pm-seed"), action = "store", dest = "pm_seed", type = "integer", default = 31415, help = "The random seed for permutation. Defautl: 31415")
-
-    # Misc
-    parser <- add_option(parser, c("--mhtn-fig-p-thrd"), action = "store", dest = "mhtn_fig_p_thrd", type = "double", default = 0.05, help = "The threshold of p-value for Manhattan plot. Default: 0.05")
-    parser <- add_option(parser, c("--draw-pwcor"), action = "store_true", dest = "draw_pwcor", help = "If the flag is given, the script will draw the pair-wise correlation plot for genotypes and covariates.")
 
     return(parse_args2(parser))
 }
@@ -100,8 +97,6 @@ if (file.exists("./utils.R")) {
 chunk_data_to_scatter_pool <- NULL
 
 if (comm_rank == 0) {
-    library(GGally)
-    library(ggplot2)
     library(optparse)
     #
     ## Parsing CLI arguments
@@ -189,40 +184,6 @@ if (comm_rank == 0) {
         }
     }
 
-    #
-    ## Visualization of the correlation of phenotypes and covariates
-    #
-    # Whether do pair-wise correlation analysis for phenotypes and covariates (if
-    # supplied).
-    draw_pwcor <- ifelse(is.null(opts$draw_pwcor), FALSE, opts$draw_pwcor)
-    if (draw_pwcor) {
-        if (with_cvrt) {
-            pntp_cvrt_chosen <- merge(pntp_chosen, cvrt_chosen, by = "row.names", all = T)
-            rownames(pntp_cvrt_chosen) <- pntp_cvrt_chosen[, "Row.names"]
-            pntp_cvrt_chosen <- pntp_cvrt_chosen[, -1]
-        } else {
-            pntp_cvrt_chosen <- pntp_chosen
-        }
-
-        pwcor_trait <- opts$pwcor_trait
-        if (is.null(pwcor_trait)) {
-            pwcor_trait_vec <- colnames(pntp_cvrt_chosen)
-        } else {
-            pwcor_trait_vec <- str_split(pwcor_trait, ",")[[1]]
-        }
-
-        if (dim(pntp_cvrt_chosen)[[2]] < 16) {
-            pwcor_plot <- ggpairs(pntp_cvrt_chosen[, pwcor_trait_vec], cardinality_threshold = 16)
-            ggsave(str_glue("phenotypes_covariates_pairwise_{run_flag}.pdf"), plot = pwcor_plot, width = 25, height = 25)
-        } else {
-            warning("More than 16 variables in the data.frame, exceeding cardinality_threshold")
-        }
-    } else {
-        warning("Skipping the pair-wise correlation analysis for genotypes and covariates.")
-    }
-
-    # TODO: add a section to draw heatmap of Spearman's rank correlation matrix???
-
     # Remove outliers of phenotypes
     # TODO: A CLI options to decide Whether to remove outliers or not.
     padding <- opts$padding
@@ -244,14 +205,12 @@ if (comm_rank == 0) {
     }
 
     ## Phenotypes
-    #
     pntp_4me <- as.data.frame(t(pntp_chosen))
     rownames(pntp_4me) <- colnames(pntp_chosen)
     colnames(pntp_4me) <- rownames(pntp_chosen)
     cat("Dim of phenotype data.frame will be piped into MatrixEQTL:", dim(pntp_4me), "\n")
 
     ## Covariates
-    #
     if (with_cvrt) {
         cvrt_4me <- as.data.frame(t(cvrt_chosen))
         rownames(cvrt_4me) <- colnames(cvrt_chosen)
@@ -261,7 +220,7 @@ if (comm_rank == 0) {
         cat("[INFO] No covariate is supplied. Skipping covariates")
     }
 
-    # Preprocessing genotypes
+    ## Genotypes
     gntp_dosage_idx_col <- opts$gntp_dosage_idx_col
     gntp_dosage <- smtread(gntp_dosage_file, idxc = gntp_dosage_idx_col)
 
@@ -270,9 +229,6 @@ if (comm_rank == 0) {
     gntp_af <- apply(gntp_round, 1, sum) / (2 * dim(gntp_dosage)[[2]])
     nmvar_idx <- which((gntp_af >= maf_thrd) & (gntp_af <= 1 - maf_thrd))
 
-    #
-    ## Geontypes
-    #
     gntp_4me <- gntp_dosage[nmvar_idx, ]
     cat("Dim of genotype data.frame will be piped into MatrixEQTL:", dim(gntp_4me), "\n")
 
@@ -385,7 +341,6 @@ for (pm in 0: opts$pm_times) {
     )
 
     if (pm == 0) {
-        qtls_dtfm <- me$all$eqtls
         min_gene_pv_dtfm <- as.data.frame(t(me$all$min.pv.gene))
         rownames(min_gene_pv_dtfm) <- str_glue("raw_rk{comm_rank}")
     } else {
@@ -395,24 +350,20 @@ for (pm in 0: opts$pm_times) {
     }
 }
 
-chunk_data_to_gather <- list(qtls=qtls_dtfm, min_gene_pv=min_gene_pv_dtfm, chunk_id=chunk_id)
+chunk_data_to_gather <- list(min_gene_pv=min_gene_pv_dtfm, chunk_id=chunk_id)
 chunk_data_be_gather <- gather(chunk_data_to_gather)
 
 #
-## Report
+## Dump permutation results.
 #
 if (comm_rank == 0) {
-    library(qqman)
     library(data.table)
 
-    qtls_dtfm <- NULL
     min_gene_pv_dtfm <- NULL
     for (chunk in chunk_data_be_gather) {
-        if (is.null(qtls_dtfm)) {
-            qtls_dtfm <- chunk$qtls
+        if (is.null(min_gene_pv_dtfm)) {
             min_gene_pv_dtfm <- chunk$min_gene_pv
         } else {
-            qtls_dtfm <- rbind(qtls_dtfm, chunk$qtls)
             min_gene_pv_dtfm <- rbind(min_gene_pv_dtfm, chunk$min_gene_pv)
         }
     }
@@ -420,45 +371,6 @@ if (comm_rank == 0) {
     pm_pval_dtfm <- jump_apply(min_gene_pv_dtfm, func=min, win_size=opts$pm_times + 1)
     pm_pval_opt_file <- as.character(str_glue("permutation_pval_{run_flag}.tsv"))
     fwrite(pm_pval_dtfm, file = pm_pval_opt_file, sep = "\t", col.names = T)
-
-    qtls_opt_file <- as.character(str_glue("qtls_{run_flag}.tsv"))
-    fwrite(qtls_dtfm, file = qtls_opt_file, sep = "\t")
-
-    gntp_info_idx_col <- gntp_info_cols_vec[1]
-    chrom <- gntp_info_cols_vec[2]
-    position <- gntp_info_cols_vec[3]
-
-    gntp_info_dtfm <- fread(gntp_info_file, data.table = T)
-    qtls_info_dtfm <- merge(qtls_dtfm, gntp_info_dtfm, by.x = "snps", by.y = gntp_info_idx_col)
-
-    mhtn_fig_p_thrd <- opts$mhtn_fig_p_thrd
-    for (pntp in target_pntp_vec) {
-        pntp_qtls <- qtls_info_dtfm[qtls_info_dtfm$gene == pntp, c("snps", chrom, position, "pvalue")]
-
-        if (nrow(pntp_qtls) > 0) {
-            colnames(pntp_qtls) <- c("SNP", "CHR", "BP", "P")
-
-            if (pv_opt_thrd < 0.9999) {
-                lmb <- "NULL"
-            } else {
-                lmb <- lambda(pntp_qtls$P, "PVAL")
-            }
-
-            cat(str_glue("Inflation factor for {pntp}: {lmb}"), "\n")
-            pdf(str_glue("MahattanPlot_{pntp}_{run_flag}.pdf"), width = 16, height = 9)
-            manhattan(
-                pntp_qtls[pntp_qtls[, "P"] <= mhtn_fig_p_thrd, ],
-                main = str_glue("Manhattan plot for {pntp}"), ylab = "p-value(-log10)", annotateTop = T
-            )
-            dev.off()
-
-            pdf(str_glue("QQPlot_{pntp}_{run_flag}.pdf"), width = 16, height = 16)
-            qq(pntp_qtls$P, main = str_glue("Q-Q plot {pntp} (lambda={lmb})"), pch = 18, cex = 1, las = 1)
-            dev.off()
-        } else {
-            warning(str_glue("No QTL is found under p value ({pv_opt_thrd}) for {pntp} (trait or gene)"))
-        }
-    }
 }
 
 finalize()
