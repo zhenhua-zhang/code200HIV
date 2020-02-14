@@ -32,33 +32,33 @@ library(stringr)
 library(MatrixEQTL)
 
 get_args <- function() {
-    parser <- OptionParser(description = "A QTL mapping script based on MatrixEQTL")
+    parser <- OptionParser(description = "Permutation using MatrixEQTL for QTL mapping.")
     parser <- add_option(parser, c("-w", "--work-dir"), action = "store", dest = "work_dir", type = "character", default = "./qtlmapping_opd", help = "Output direcotry.")
-    parser <- add_option(parser, c("--run-flag"), action = "store", dest = "run_flag", type = "character", default = "test", help = "Running flag which help to discrimnate different runs.")
+    parser <- add_option(parser, "--run-flag", action = "store", dest = "run_flag", type = "character", default = "test", help = "Running flag which help to discrimnate different runs.")
 
     # Phenotypes related parameters
     parser <- add_option(parser, c("-p", "--pntp-file"), action = "store", dest = "pntp_file", type = "character", help = "Phenotype input file.")
-    parser <- add_option(parser, c("--padding"), action = "store", dest = "padding", type = "integer", default = 4, help = "The times of standard deviation as the boundary of outliers.")
-    parser <- add_option(parser, c("--target-pntp"), action = "store", dest = "target_pntp", type = "character", help = "The phenotypes will be used, if more than one, using comma as delimiter.")
-    parser <- add_option(parser, c("--trps-pntp-dtfm"), action = "store_true", dest = "trps_pntp_dtfm", help = "Whether should transpose the data.frame of phenotypes to make the columns as sample ID.")
-    parser <- add_option(parser, c("--pntp-idx-col"), action = "store", dest = "pntp_idx_col", type = "character", default = "id", help = "The id column in phenotype file")
+    parser <- add_option(parser, "--padding", action = "store", dest = "padding", type = "integer", default = 4, help = "The times of standard deviation as the boundary of outliers.")
+    parser <- add_option(parser, "--target-pntp", action = "store", dest = "target_pntp", type = "character", help = "The phenotypes will be used, if more than one, using comma as delimiter.")
+    parser <- add_option(parser, "--trps-pntp-dtfm", action = "store_true", dest = "trps_pntp_dtfm", help = "Whether should transpose the data.frame of phenotypes to make the columns as sample ID.")
+    parser <- add_option(parser, "--pntp-idx-col", action = "store", dest = "pntp_idx_col", type = "character", default = "id", help = "The id column in phenotype file")
 
     # Covariates related parameters
     parser <- add_option(parser, c("-c", "--cvrt-file"), action = "store", dest = "cvrt_file", type = "character", help = "Covariates file.")
-    parser <- add_option(parser, c("--target-cvrt"), action = "store", dest = "target_cvrt", type = "character", help = "Covariates will be used, if more than one, using comma as delimiter.")
-    parser <- add_option(parser, c("--trps-cvrt-dtfm"), action = "store_true", dest = "trps_cvrt_dtfm", help = "Whether should transpose the data.frame of covariates.")
-    parser <- add_option(parser, c("--cvrt-idx-col"), action = "store", dest = "cvrt_idx_col", type = "character", default = "id", help = "The id column in covariates file")
+    parser <- add_option(parser, "--target-cvrt", action = "store", dest = "target_cvrt", type = "character", help = "Covariates will be used, if more than one, using comma as delimiter.")
+    parser <- add_option(parser, "--trps-cvrt-dtfm", action = "store_true", dest = "trps_cvrt_dtfm", help = "Whether should transpose the data.frame of covariates.")
+    parser <- add_option(parser, "--cvrt-idx-col", action = "store", dest = "cvrt_idx_col", type = "character", default = "id", help = "The id column in covariates file")
 
     # Genotypes related parameters
     parser <- add_option(parser, c("-d", "--gntp-dosage-file"), action = "store", dest = "gntp_dosage_file", type = "character", help = "The genotype dosage file (could be compressed).")
-    parser <- add_option(parser, c("--genotype-dosage-idx-col"), action = "store", dest = "gntp_dosage_idx_col", type = "character", default = "id", help = "The id column in genotype file, usually its the name of column of SNP id. Default: id")
+    parser <- add_option(parser, "--genotype-dosage-idx-col", action = "store", dest = "gntp_dosage_idx_col", type = "character", default = "id", help = "The id column in genotype file, usually its the name of column of SNP id. Default: id")
     parser <- add_option(parser, c("-i", "--gntp-info-file"), action = "store", dest = "gntp_info_file", type = "character", help = "The genotype information file (could be compressed).")
-    parser <- add_option(parser, c("--gntp-info-cols"), action = "store", dest = "gntp_info_cols", type = "character", default = "rsID,SequenceName,Position,EffectAllele,AlternativeAllele", help = paste("The columns will be used.", "Default: rsID,SequenceName,Position,EffectAllele,AlternativeAllele"))
-    parser <- add_option(parser, c("--maf-thrd"), action = "store", dest = "maf_thrd", type = "double", default = 0.05, help = "Minor allele frequency.")
+    parser <- add_option(parser, "--gntp-info-cols", action = "store", dest = "gntp_info_cols", type = "character", default = "rsID,SequenceName,Position,EffectAllele,AlternativeAllele", help = paste("The columns will be used.", "Default: rsID,SequenceName,Position,EffectAllele,AlternativeAllele"))
+    parser <- add_option(parser, "--maf-thrd", action = "store", dest = "maf_thrd", type = "double", default = 0.05, help = "Minor allele frequency.")
 
     # Permutations
-    parser <- add_option(parser, c("--pm-times"), action = "store", dest = "pm_times", type = "integer", default = 0, help = "How many times of permutations should be done. If it's less than 1, no permutation will be performed but only 'raw' data will be used in the mapping. Default: 0") 
-    parser <- add_option(parser, c("--pm-seed"), action = "store", dest = "pm_seed", type = "integer", default = 31415, help = "The random seed for permutation. Defautl: 31415")
+    parser <- add_option(parser, "--pm-times", action = "store", dest = "pm_times", type = "integer", default = 1000, help = "How many times of permutations should be done. If it's less than 1, no permutation will be performed but only 'raw' data will be used in the mapping. Default: 0")
+    parser <- add_option(parser, "--pm-seed", action = "store", dest = "pm_seed", type = "integer", default = 31415, help = "The random seed for permutation. Defautl: 31415")
 
     return(parse_args2(parser))
 }
@@ -238,10 +238,7 @@ if (comm_rank == 0) {
     if (with_cvrt) {
         cvrt_samples <- colnames(cvrt_4me)
         shared_samples <- intersect(pntp_samples, intersect(cvrt_samples, gntp_samples))
-
-        # Write the covariates which are used in the QTL mapping into disk.
         cvrt_mtrx_4me <- as.matrix(cvrt_4me[, shared_samples])
-        fwrite(cvrt_4me[, shared_samples], file = str_glue("covariates_fedtoMatrixEQTL_{run_flag}.tsv"), sep = "\t", row.names = T, col.names = T)
     } else {
         shared_samples <- intersect(pntp_samples, gntp_samples)
         cvrt_mtrx_4me <- NULL
@@ -251,8 +248,6 @@ if (comm_rank == 0) {
     cat("Samples (", n_shared_samples, ") will be fed to MatrixEQTL:", shared_samples, "\n")
 
     pntp_mtrx_4me <- as.matrix(pntp_4me[, shared_samples])
-    fwrite(pntp_4me[, shared_samples], file = str_glue("phenotypes_fedtoMatrixEQTL_{run_flag}.tsv"), sep = "\t", row.names = T, col.names = T)
-
     gntp_mtrx_4me <- as.matrix(gntp_4me[, shared_samples])
 
     n_row <- base::nrow(gntp_mtrx_4me)
@@ -370,7 +365,7 @@ if (comm_rank == 0) {
 
     pm_pval_dtfm <- jump_apply(min_gene_pv_dtfm, func=min, win_size=opts$pm_times + 1)
     pm_pval_opt_file <- as.character(str_glue("permutation_pval_{run_flag}.tsv"))
-    fwrite(pm_pval_dtfm, file = pm_pval_opt_file, sep = "\t", col.names = T)
+    fwrite(pm_pval_dtfm, file = pm_pval_opt_file, sep = "\t", col.names = T, row.names = T)
 }
 
 finalize()

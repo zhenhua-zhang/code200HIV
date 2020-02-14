@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --time=4:59:0
-#SBATCH --mem=15G
+#SBATCH --time=6:59:0
+#SBATCH --mem=10G
 #SBATCH --cpus=15
 #SBATCH --output=%A_%a-%u-qtlmapping_permutation_mpi_v0.1.0.log
 #SBATCH --job-name=qtlmapping_permutation_mpi
-#SBATCH --array=1-2
+#SBATCH --array=1
 
 #
 ## NOTE: 
@@ -33,11 +33,11 @@ o_dir=${p_dir}/outputs
 chromId=${SLURM_ARRAY_TASK_ID:=1}
 
 mpirun -np 15 --oversubscribe \
-    Rscript ./qtlmapping_mpi_v0.1.0.R \
-    --run-flag padding4_mpi_${chromId} \
+    Rscript ${p_dir}/scripts/qtlmapping_permutation_mpi_v0.1.0.R \
+    --run-flag chr${chromId} \
     --trps-cvrt-dtfm \
     --trps-pntp-dtfm \
-    --work-dir ${o_dir}/HIVReservior/HIVReservior_AGC4nHd/padding4_mpi \
+    --work-dir ${o_dir}/HIVReservior/HIVReservior_AGC4nHd/padding4_permutation \
     --pntp-file ${i_dir}/datasets/20190524_HIVreservoir_GENT_withRNADNARatio.tsv \
     --target-pntp RNAHIV_CD4LOG,DNAHIV_CD4LOG,RNAvsDNA_CD4LOG \
     --cvrt-file ${i_dir}/datasets/metaData_pcntgMnct_ssnlt_CD4CD8TC_CD4NADIR_HIVDuration_20190728.csv \
