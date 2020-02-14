@@ -24,7 +24,6 @@
 
 
 library(qqman)
-library(pbdMPI)
 library(GGally)
 library(stringr)
 library(ggplot2)
@@ -42,154 +41,42 @@ debug <- FALSE
 ## Parsing CLI arguments
 #
 parser <- OptionParser(description = "A QTL mapping script based on MatrixEQTL")
-
-parser <- add_option(
-    parser, c("-w", "--work-dir"),
-    action = "store", dest = "work_dir", type = "character", default = "./qtlmapping_opd",
-    help = "Output direcotry."
-)
-
-parser <- add_option(
-    parser, c("--run-flag"),
-    action = "store", dest = "run_flag", type = "character", default = "test",
-    help = "Running flag which help to discrimnate different runs."
-)
+parser <- add_option(parser, opt_str = c("-w", "--work-dir"), action = "store", dest = "work_dir", type = "character", default = "./qtlmapping_opd", help = "Output direcotry.")
+parser <- add_option(parser, opt_str = "--run-flag", action = "store", dest = "run_flag", type = "character", default = "test", help = "Running flag which help to discrimnate different runs.")
 
 # Phenotypes related parameters
-parser <- add_option(
-    parser, c("-p", "--pntp-file"),
-    action = "store", dest = "pntp_file", type = "character",
-    help = "Phenotype input file."
-)
-
-parser <- add_option(
-    parser, c("--padding"),
-    action = "store", dest = "padding", type = "integer", default = 4,
-    help = "The times of standard deviation as the boundary of outliers."
-)
-
-parser <- add_option(
-    parser, c("--target-pntp"),
-    action = "store", dest = "target_pntp", type = "character",
-    help = "The phenotypes will be used, if more than one, using comma as delimiter."
-)
-
-parser <- add_option(
-    parser, c("--trps-pntp-dtfm"),
-    action = "store_true", dest = "trps_pntp_dtfm",
-    help = "Whether should transpose the data.frame of phenotypes to make the columns as sample ID."
-)
-
-parser <- add_option(
-    parser, c("--pntp-idx-col"),
-    action = "store", dest = "pntp_idx_col", type = "character", default = "id",
-    help = "The id column in phenotype file"
-)
+parser <- add_option(parser, opt_str = c("-p", "--pntp-file"), action = "store", dest = "pntp_file", type = "character", help = "Phenotype input file.")
+parser <- add_option(parser, opt_str = "--padding", action = "store", dest = "padding", type = "integer", default = 4, help = "The times of standard deviation as the boundary of outliers.")
+parser <- add_option(parser, opt_str = "--target-pntp", action = "store", dest = "target_pntp", type = "character", help = "The phenotypes will be used, if more than one, using comma as delimiter.")
+parser <- add_option(parser, opt_str = "--trps-pntp-dtfm", action = "store_true", dest = "trps_pntp_dtfm", help = "Whether should transpose the data.frame of phenotypes to make the columns as sample ID.")
+parser <- add_option(parser, opt_str = "--pntp-idx-col", action = "store", dest = "pntp_idx_col", type = "character", default = "id", help = "The id column in phenotype file")
 
 # Covariates related parameters
-parser <- add_option(
-    parser, c("-c", "--cvrt-file"),
-    action = "store", dest = "cvrt_file", type = "character",
-    help = "Covariates file."
-)
-
-parser <- add_option(
-    parser, c("--target-cvrt"),
-    action = "store", dest = "target_cvrt", type = "character",
-    help = "Covariates will be used, if more than one, using comma as delimiter."
-)
-
-parser <- add_option(
-    parser, c("--trps-cvrt-dtfm"),
-    action = "store_true", dest = "trps_cvrt_dtfm",
-    help = "Whether should transpose the data.frame of covariates."
-)
-
-parser <- add_option(
-    parser, c("--cvrt-idx-col"),
-    action = "store", dest = "cvrt_idx_col", type = "character", default = "id",
-    help = "The id column in covariates file"
-)
+parser <- add_option(parser, opt_str = c("-c", "--cvrt-file"), action = "store", dest = "cvrt_file", type = "character", help = "Covariates file.")
+parser <- add_option(parser, opt_str = "--target-cvrt", action = "store", dest = "target_cvrt", type = "character", help = "Covariates will be used, if more than one, using comma as delimiter.")
+parser <- add_option(parser, opt_str = "--trps-cvrt-dtfm", action = "store_true", dest = "trps_cvrt_dtfm", help = "Whether should transpose the data.frame of covariates.")
+parser <- add_option(parser, opt_str = "--cvrt-idx-col", action = "store", dest = "cvrt_idx_col", type = "character", default = "id", help = "The id column in covariates file")
+parser <- add_option(parser, opt_str = "--apply-log10-on-cvrt", action = "store", dest = "apply_log10_on_cvrt", type = "character", default = NULL, help = "Apply log10 transform on given covariates. Default: %default")
+parser <- add_option(parser, opt_str = "--apply-scale-on-cvrt", action = "store", dest = "apply_scale_on_cvrt", type = "character", default = NULL, help = "Apply scale transform on given covariates. Default: %default")
 
 # Phenotypes and covariates correlation
-parser <- add_option(
-    parser, c("-t", "--pwcor-trait"),
-    action = "store", dest = "pwcor_trait", type = "character",
-    help = "Traits will be correlated with in paire-wised way. The options will be ignored if --draw-pwcor isn't given."
-)
+parser <- add_option(parser, opt_str = c("-t", "--pwcor-trait"), action = "store", dest = "pwcor_trait", type = "character", help = "Traits will be correlated with in paire-wised way. The options will be ignored if --draw-pwcor isn't given.")
 
 # Genotypes related parameters
-parser <- add_option(
-    parser, c("-d", "--gntp-dosage-file"),
-    action = "store", dest = "gntp_dosage_file", type = "character",
-    help = "The genotype dosage file (could be compressed)."
-)
-
-parser <- add_option(
-    parser, c("--genotype-dosage-idx-col"),
-    action = "store", dest = "gntp_dosage_idx_col", type = "character", default = "id",
-    help = "The id column in genotype file, usually its the name of column of SNP id. Default: id"
-)
-
-parser <- add_option(
-    parser, c("-i", "--gntp-info-file"),
-    action = "store", dest = "gntp_info_file", type = "character",
-    help = "The genotype information file (could be compressed)."
-)
-
-parser <- add_option(
-    parser, c("--gntp-info-cols"),
-    action = "store", dest = "gntp_info_cols", type = "character",
-    default = "rsID,SequenceName,Position,EffectAllele,AlternativeAllele",
-    help = paste(
-        "The columns will be used.", 
-        "Default: rsID,SequenceName,Position,EffectAllele,AlternativeAllele"
-    )
-)
-
-parser <- add_option(
-    parser, c("--maf-thrd"),
-    action = "store", dest = "maf_thrd", type = "double", default = 0.05,
-    help = "Minor allele frequency."
-)
+parser <- add_option(parser, opt_str = c("-d", "--gntp-dosage-file"), action = "store", dest = "gntp_dosage_file", type = "character", help = "The genotype dosage file (could be compressed).")
+parser <- add_option(parser, opt_str = "--gntp-dosage-idx-col", action = "store", dest = "gntp_dosage_idx_col", type = "character", default = "id", help = "The id column in genotype file, usually its the name of column of SNP id. Default: id")
+parser <- add_option(parser, opt_str = c("-i", "--gntp-info-file"), action = "store", dest = "gntp_info_file", type = "character", help = "The genotype information file (could be compressed).")
+parser <- add_option(parser, opt_str = "--gntp-info-cols", action = "store", dest = "gntp_info_cols", type = "character", default = "rsID,SequenceName,Position,EffectAllele,AlternativeAllele", help = "The columns will be used. Default: rsID,SequenceName,Position,EffectAllele,AlternativeAllele")
+parser <- add_option(parser, opt_str = "--maf-thrd", action = "store", dest = "maf_thrd", type = "double", default = 0.05, help = "Minor allele frequency.")
 
 # Permutations
-parser <- add_option(
-    parser, c("--pm-times"),
-    action = "store", dest = "pm_times", type = "integer", default = 0,
-    help = paste(
-        "How many times of permutations should be done. If it's less than 1,",
-        "no permutation will be performed but only 'raw' data will be used in",
-        "the mapping. Default: 0"
-    )
-)
-
-parser <- add_option(
-    parser, c("--pm-seed"),
-    action = "store", dest = "pm_seed", type = "integer", default = 31415,
-    help = "The random seed for permutation. Defautl: 31415"
-)
-
-parser <- add_option(
-    parser, c("--pm-threads"),
-    action = "store", dest = "pm_threads", type = "integer", default = 1,
-    help = "The number of threads used in permutations. Default: 1"
-)
-
+parser <- add_option(parser, opt_str = "--pm-times", action = "store", dest = "pm_times", type = "integer", default = 0, help = paste("How many times of permutations should be done. If it's less than 1, no permutation will be performed but only 'raw' data will be used in the mapping. Default: 0" ))
+parser <- add_option(parser, opt_str = "--pm-seed", action = "store", dest = "pm_seed", type = "integer", default = 31415, help = "The random seed for permutation. Defautl: 31415")
+parser <- add_option(parser, opt_str = "--pm-threads", action = "store", dest = "pm_threads", type = "integer", default = 1, help = "The number of threads used in permutations. Default: 1")
 
 # Misc
-parser <- add_option(
-    parser, c("--mhtn-fig-p-thrd"),
-    action = "store", dest = "mhtn_fig_p_thrd", type = "double", default = 0.05,
-    help = "The threshold of p-value for Manhattan plot. Default: 0.05"
-)
-
-parser <- add_option(
-    parser, c("--draw-pwcor"),
-    action = "store_true", dest = "draw_pwcor",
-    help = "If the flag is given, the script will draw the pair-wise correlation plot for genotypes and covariates."
-)
-
+parser <- add_option(parser, opt_str = "--mhtn-fig-p-thrd", action = "store", dest = "mhtn_fig_p_thrd", type = "double", default = 0.05, help = "The threshold of p-value for Manhattan plot. Default: 0.05")
+parser <- add_option(parser, opt_str = "--draw-pwcor", action = "store_true", dest = "draw_pwcor", help = "If the flag is given, the script will draw the pair-wise correlation plot for genotypes and covariates.")
 opts_args <- parse_args2(parser)
 opts <- opts_args$options
 
@@ -215,10 +102,7 @@ gntp_info_cols <- opts$gntp_info_cols
 gntp_info_cols_vec <- str_split(gntp_info_cols, pattern = ",")[[1]]
 if (length(gntp_info_cols_vec) != 5) {
     print_help(parser)
-    stop(
-        "The length of --genotype-info-cols should be 5 and splitted by comma.\n",
-        "    e.g: rsID,SequenceName,Position,EffectAllele,AlternativeAllele"
-    )
+    stop("The length of --genotype-info-cols should be 5 and splitted by comma.\n  e.g: rsID,SequenceName,Position,EffectAllele,AlternativeAllele")
 }
 
 run_flag <- opts$run_flag
@@ -226,7 +110,7 @@ work_dir <- opts$work_dir
 if (! dir.exists(work_dir)) {
     dir.create(work_dir, recursive = TRUE)
 } else {
-    warning("The given work direcotry exists, will using it directly!")
+    warning("The given work direcotry exists, will use it directly!")
 }
 setwd(work_dir)
 
@@ -234,7 +118,21 @@ target_pntp <- opts$target_pntp
 if (is.null(target_pntp)) {
     target_pntp_vec <- NULL
 } else {
-    target_pntp_vec <- str_split(target_pntp, ",")[[1]]
+    target_pntp_vec <- str_split(target_pntp, pattern = ",")[[1]]
+}
+
+apply_log10_on_cvrt <- opts$apply_log10_on_cvrt
+if (is.null(apply_log10_on_cvrt)) {
+    apply_log10_on_vec <- NULL
+} else {
+    apply_log10_on_vec <- str_split(apply_log10_on_cvrt, pattern = ",")[[1]]
+}
+
+apply_scale_on_cvrt <- opts$apply_scale_on_cvrt
+if (is.null(apply_scale_on_cvrt)) {
+    apply_scale_on_vec <- NULL
+} else {
+    apply_scale_on_vec <- str_split(apply_scale_on_cvrt, pattern = ",")[[1]]
 }
 
 pntp_idx_col <- opts$pntp_idx_col
@@ -261,7 +159,7 @@ if (is.null(cvrt_file)) {
     if (is.null(target_cvrt)) {
         target_cvrt_vec <- NULL
     } else {
-        target_cvrt_vec <- str_split(target_cvrt, ",")[[1]]
+        target_cvrt_vec <- str_split(target_cvrt, pattern = ",")[[1]]
     }
 
     cvrt_idx_col <- opts$cvrt_idx_col
@@ -269,8 +167,12 @@ if (is.null(cvrt_file)) {
     trps_cvrt_dtfm <- ifelse(is.null(opts$trps_cvrt_dtfm), FALSE, opts$trps_cvrt_dtfm)
     if (trps_cvrt_dtfm) {
         cvrt_chosen <- smtread(cvrt_file, idxc = cvrt_idx_col, kpc = target_cvrt_vec)
+        cvrt_chosen[, apply_log10_on_vec] <- sapply(cvrt_chosen[, apply_log10_on_vec], log10)
+        cvrt_chosen[, apply_scale_on_vec] <- sapply(cvrt_chosen[, apply_scale_on_vec], scale)
     } else {
         cvrt_chosen <- smtread(cvrt_file, idxc = cvrt_idx_col, kpr = target_cvrt_vec, trps = TRUE)
+        cvrt_chosen[apply_log10_on_vec, ] <- sapply(cvrt_chosen[apply_log10_on_vec, ], log10)
+        cvrt_chosen[apply_scale_on_vec, ] <- sapply(cvrt_chosen[apply_scale_on_vec, ], scale)
     }
 }
 
@@ -293,7 +195,7 @@ if (draw_pwcor) {
     if (is.null(pwcor_trait)) {
         pwcor_trait_vec <- colnames(pntp_cvrt_chosen)
     } else {
-        pwcor_trait_vec <- str_split(pwcor_trait, ",")[[1]]
+        pwcor_trait_vec <- str_split(pwcor_trait, pattern = ",")[[1]]
     }
 
     if (dim(pntp_cvrt_chosen)[[2]] < 16) {
@@ -454,17 +356,11 @@ for (pm in 0:pm_times) {
     if (pm == 0) {
         min_gene_pv_dtfm <- as.data.frame(t(me$all$min.pv.gene))
         rownames(min_gene_pv_dtfm) <- "raw"
-        fwrite(
-            min_gene_pv_dtfm, file = genePermutationFileName,
-            showProgress = F, row.names = T
-        )
+        fwrite(min_gene_pv_dtfm, file = genePermutationFileName, showProgress = F, row.names = T)
     } else {
         min_gene_pv_dtfm <- as.data.frame(t(me$all$min.pv.gene))
         rownames(min_gene_pv_dtfm) <- paste0("pm", pm)
-        fwrite(
-            min_gene_pv_dtfm, file = genePermutationFileName,
-            append = T, showProgress = F, row.names = T, col.names = F
-        )
+        fwrite(min_gene_pv_dtfm, file = genePermutationFileName, append = T, showProgress = F, row.names = T, col.names = F)
     }
 }
 
@@ -499,10 +395,7 @@ for (pntp in target_pntp_vec) {
 
         cat(str_glue("Inflation factor for {pntp}: {lmb}"), "\n")
         pdf(str_glue("MahattanPlot_{pntp}_{run_flag}.pdf"), width = 16, height = 9)
-        manhattan(
-            pntp_qtls[pntp_qtls[, "P"] <= mhtn_fig_p_thrd, ],
-            main = str_glue("Manhattan plot for {pntp}"), ylab = "p-value(-log10)", annotateTop = TRUE
-        )
+        manhattan(pntp_qtls[pntp_qtls[, "P"] <= mhtn_fig_p_thrd, ], main = str_glue("Manhattan plot for {pntp}"), ylab = "p-value(-log10)", annotateTop = TRUE)
         dev.off()
 
         pdf(str_glue("QQPlot_{pntp}_{run_flag}.pdf"), width = 16, height = 16)
