@@ -40,99 +40,23 @@ if (file.exists("./utils.R")) {
 }
 
 # << Options and flags
-parser <- OptionParser(
-    description = "Draw phenotype level per genotype plot for given SNP"
-)
+parser <- OptionParser(description = "Draw phenotype level per genotype plot for given SNP")
+parser <- add_option(parser, c("--scale-pntp"), action = "store_true", dest = "scale_phenotype", help = "Whether scale phenotype for the phenotype level per genotype box plots.")
+parser <- add_option(parser, c("--use-gntp-symbols"), action = "store_true", dest = "use_smb", help = "Whether use genotype symbols in the regression instead of genotype dosage. If the flag is on, the genotype will be taken as categorical variables. Otherwise, it's additive linear.")
+parser <- add_option(parser, c("--corr-by-cvrt"), action = "store_true", dest = "corr_by_cvrt", help = "Whther correct by covariates")
 
-parser <- add_option(
-    parser, c("--scale-phenotype"),
-    action = "store_true", dest = "scale_phenotype",
-    help = "Whether scale phenotype for the phenotype level per genotype box plots."
-)
-
-parser <- add_option(
-    parser, c("--use-genotype-symbols"),
-    action = "store_true", dest = "use_smb",
-    help = paste(
-        "Whether use genotype symbols in the regression instead of genotype dosage.",
-        "If the flag is on, the genotype will be taken as categorical variables.",
-        "Otherwise, it's additive linear."
-    )
-)
-
-parser <- add_option(
-    parser, c("-d", "--genotype-dosage-file"),
-    action = "store", dest = "genotype_dosage_file", type = "character",
-    help = "The genotype dosage file (could be compressed)."
-)
-
-parser <- add_option(
-    parser, c("--genotype-dosage-idx-col"),
-    action = "store", dest = "genotype_dosage_idx_col", type = "character", default = "id",
-    help = "The id column in genotype file, usually its the name of column of SNP id. Default: %default"
-)
-
-parser <- add_option(
-    parser, c("-i", "--genotype-info-file"),
-    action = "store", dest = "genotype_info_file", type = "character",
-    help = "The genotype information file (could be compressed)"
-)
-
-parser <- add_option(
-    parser, c("--genotype-info-cols"),
-    action = "store", dest = "genotype_info_cols", type = "character",
-    default = "rsID,SequenceName,Position,EffectAllele,AlternativeAllele",
-    help = "The columns will be used. Default: %default"
-)
-
-parser <- add_option(
-    parser, c("--target-snp"),
-    action = "store", dest = "target_snp", type = "character",
-    help = "The SNP which the phenotype level per genotype plot will be plotted."
-)
-
-parser <- add_option(
-    parser, c("-p", "--phenotype-file"),
-    action = "store", dest = "phenotype_file", type = "character",
-    help = "The phenotype file"
-)
-
-parser <- add_option(
-    parser, c("-P", "--target-phenotypes"),
-    action = "store", dest = "target_phenotypes", type = "character",
-    help = "The phenotype will be used in the plots"
-)
-
-parser <- add_option(
-    parser, c("--phenotype-idx-col"),
-    action = "store", dest = "phenotype_idx_col", type = "character", default = "id",
-    help = "The id column in phenotype file. Default: %default"
-)
-
-parser <- add_option(
-    parser, c("-c", "--covariate-file"),
-    action = "store", dest = "covariate_file", type = "character",
-    help = "The file including covariates"
-)
-
-parser <- add_option(
-    parser, c("--target-covariates"),
-    action = "store", dest = "target_covariates", type = "character",
-    help = "Target covariates"
-)
-
-parser <- add_option(
-    parser, c("--covariate-idx-col"),
-    action = "store", dest = "covariate_idx_col", type = "character", default = "id",
-    help = "The id column in covariates file. Default: %default"
-)
-
-parser <- add_option(
-    parser, c("-O", "--output-dir"),
-    action = "store", dest = "output_dir", type = "character", default = "output_dir",
-    help = "The output direcotry which will be created if not exists. Default: %default"
-)
-
+parser <- add_option(parser, c("-d", "--gntp-dosage-file"), action = "store", dest = "genotype_dosage_file", type = "character", help = "The genotype dosage file (could be compressed).")
+parser <- add_option(parser, c("--gntp-dosage-idx-col"), action = "store", dest = "genotype_dosage_idx_col", type = "character", default = "id", help = "The id column in genotype file, usually its the name of column of SNP id. Default: %default")
+parser <- add_option(parser, c("-i", "--gntp-info-file"), action = "store", dest = "genotype_info_file", type = "character", help = "The genotype information file (could be compressed)")
+parser <- add_option(parser, c("--gntp-info-cols"), action = "store", dest = "genotype_info_cols", type = "character", default = "rsID,SequenceName,Position,EffectAllele,AlternativeAllele", help = "The columns will be used. Default: %default")
+parser <- add_option(parser, c("--target-snp"), action = "store", dest = "target_snp", type = "character", help = "The SNP which the phenotype level per genotype plot will be plotted.")
+parser <- add_option(parser, c("-p", "--pntp-file"), action = "store", dest = "phenotype_file", type = "character", help = "The phenotype file")
+parser <- add_option(parser, c("-P", "--target-pntp"), action = "store", dest = "target_phenotypes", type = "character", help = "The phenotype will be used in the plots")
+parser <- add_option(parser, c("--pntp-idx-col"), action = "store", dest = "phenotype_idx_col", type = "character", default = "id", help = "The id column in phenotype file. Default: %default")
+parser <- add_option(parser, c("-c", "--cvrt-file"), action = "store", dest = "covariate_file", type = "character", help = "The file including covariates")
+parser <- add_option(parser, c("--target-cvrt"), action = "store", dest = "target_covariates", type = "character", help = "Target covariates")
+parser <- add_option(parser, c("--cvrt-idx-col"), action = "store", dest = "covariate_idx_col", type = "character", default = "id", help = "The id column in covariates file. Default: %default")
+parser <- add_option(parser, c("-O", "--output-dir"), action = "store", dest = "output_dir", type = "character", default = "output_dir", help = "The output direcotry which will be created if not exists. Default: %default")
 
 opts_args <- parse_args2(parser)
 opts <- opts_args$options
@@ -155,10 +79,7 @@ genotype_info_cols <- opts$genotype_info_cols
 genotype_info_cols_vec <- str_split(genotype_info_cols, pattern = ",")[[1]]
 if (length(genotype_info_cols_vec) < 5) {
     print_help(parser)
-    stop(
-        "The length of --genotype-info-cols should be 5 and splitted by comma.\n",
-        "    e.g: rsID,SequenceName,Position,EffectAllele,AlternativeAllele"
-    )
+    stop("The length of --genotype-info-cols should be 5 and splitted by comma.\n    e.g: rsID,SequenceName,Position,EffectAllele,AlternativeAllele")
 }
 
 target_snp <- opts$target_snp
@@ -175,7 +96,7 @@ output_dir <- opts$output_dir
 if (! dir.exists(output_dir)) {
     dir.create(output_dir, recursive = TRUE)
 } else {
-    warning("The given output direcotry exists, will using it directly!")
+    warning("The given output direcotry exists, will use it directly!")
 }
 
 #
@@ -234,6 +155,7 @@ if (! is.null(covariate_file)) {
 }
 
 use_smb <- ifelse(is.null(opts$use_smb), FALSE, opts$use_smb)
+corr_by_cvrt = ifelse(is.null(opts$corr_by_cvrt), FALSE, opts$corr_by_cvrt)
 scale_phenotype <- ifelse(is.null(opts$scale_phenotype), FALSE, opts$scale_phenotype)
 
 for (target_snp in target_snp_vec) {
@@ -243,6 +165,8 @@ for (target_snp in target_snp_vec) {
 
     target_snp_dosage <- genotype_dosage[target_snp, ]
     target_snp_round <- round(target_snp_dosage)
+    print(target_snp_round)
+    print(sapply(target_snp_dosage, function(e){if (e <= 0.5) return(0) else if (e >= 1.5) return(2) else return(1)}))
 
     target_snp_info <- genotype_info[target_snp, ]
 
@@ -328,9 +252,9 @@ for (target_snp in target_snp_vec) {
         capture.output(cat(">>> Summary for generalized linear regression for phenotype:", target_phenotype, "\n\n\n"), file = output_file, append = TRUE)
 
         if (scale_phenotype) {
-            work_dtfm["pntp_adj"] <- scale(glm_fit$residuals[rownames(work_dtfm)])
+            work_dtfm["pntp_adj"] <- scale(-glm_fit$residuals[rownames(work_dtfm)])
         } else {
-            work_dtfm["pntp_adj"] <- glm_fit$residuals[rownames(work_dtfm)]
+            work_dtfm["pntp_adj"] <- -glm_fit$residuals[rownames(work_dtfm)]
         }
 
         work_dtfm["gntp_enc"] <- factor(work_dtfm[, "gntp_enc"], levels = genotypes)
@@ -344,16 +268,18 @@ for (target_snp in target_snp_vec) {
         count_per_genotype <- table(work_dtfm[, "gntp_enc"])
         x_tick_lables <- paste0(paste(genotypes, count_per_genotype[genotypes], sep = "("), ")")
 
-        ylabel <- ifelse(
-             is.null(target_covariates),
-             str_glue("Level of {target_phenotype}"),
-             str_glue("Level of ({target_phenotype} | {target_covariates})")
-        )
+        if (corr_by_cvrt && (! is.null(target_covariates))) {
+            pntp = "pntp_adj"
+            ylabel <- str_glue("Level of ({target_phenotype} | {target_covariates})")
+        } else {
+            pntp = "pntp"
+            ylabel <- str_glue("Level of {target_phenotype}")
+        }
         ftitle <- str_glue("Boxplot for {target_snp} x {target_phenotype}")
 
         g <- ggplot(data = work_dtfm) + theme_bw()
-        g <- g + geom_boxplot(aes(x = gntp_enc, y = pntp_adj, color = gntp_enc))
-        g <- g + geom_point(aes(x = gntp_enc, y = pntp_adj), size = 0.5)
+        g <- g + geom_boxplot(aes_string(x = "gntp_enc", y = pntp, color = "gntp_enc"))
+        g <- g + geom_point(aes_string(x = "gntp_enc", y = pntp), size = 0.5)
         g <- g + labs(title = ftitle, x = xlabel, y = ylabel, color = "Genotype")
         g <- g + scale_x_discrete(labels = x_tick_lables)
         g <- g + theme(plot.title = element_text(hjust = 0.5))
