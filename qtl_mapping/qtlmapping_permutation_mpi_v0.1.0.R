@@ -90,8 +90,8 @@ init()
 comm_size <- comm.size()
 comm_rank <- comm.rank()
 
-if (file.exists("./utils.R")) {
-    source("./utils.R")
+if (file.exists("../utils/utils.R")) {
+    source("../utils/utils.R")
 }
 
 chunk_data_to_scatter_pool <- NULL

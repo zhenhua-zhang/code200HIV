@@ -21,7 +21,7 @@ genotype_info_file=${i_dir}/dosages/MatrixEQTL/200HIV_variantInfo.gz
 phenotype_file=${i_dir}/datasets/20190524_HIVreservoir_GENT_withRNADNARatio.tsv
 covariate_file=${i_dir}/datasets/metaData_pcntgMnct_ssnlt_CD4CD8TC_CD4NADIR_HIVDuration_20190728.csv
 target_covariates=age,gender,CD4_NADIR,HIV_DURATION
-target_snp=rs7113204,rs7817589
+target_snp=rs7113204,rs7817589,rs7113255,rs2613996,rs12366210
 
 # Outputs
 output_dir=${o_dir}/HIVReservior/HIVReservior_AGC4nHd/significant_QTLs/$target_snp
@@ -31,7 +31,7 @@ Rscript check_gntp_pntp_v0.2.0.R \
     --gntp-dosage-file $genotype_dosage_file \
     --gntp-info-file $genotype_info_file \
     --pntp-file $phenotype_file \
-    --target-pntp RNAvsDNA_CD4LOG \
+    --target-pntp RNAvsDNA_CD4LOG,DNAHIV_CD4LOG \
     --cvrt-file $covariate_file \
     --target-cvrt $target_covariates \
     --target-snp $target_snp \

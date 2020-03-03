@@ -31,8 +31,10 @@ smtread <- function(file_path, ..., idxc = "id", kpr = NULL, rmr = NULL, kpc = N
 
     col_names <- colnames(dtfm)
     if (idxc %in% col_names) {
-        rownames(dtfm) <- dtfm[, idxc]
-        dtfm <- dtfm[, col_names[!col_names %in% c(idxc)]]
+        rownames(dtfm) <- row_names <- dtfm[, idxc]
+        dtfm <- as.data.frame(dtfm[, col_names[!col_names %in% c(idxc)]])
+        colnames(dtfm) <- col_names[!col_names %in% c(idxc)]
+        rownames(dtfm) <- row_names
     } else {
         stop("The given `idxc = ", idxc, "` is not in the column names")
     }

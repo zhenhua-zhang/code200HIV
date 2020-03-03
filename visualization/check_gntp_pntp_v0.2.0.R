@@ -35,8 +35,8 @@ library(stringr, warn.conflicts = FALSE, quietly = TRUE)
 library(optparse, warn.conflicts = FALSE, quietly = TRUE)
 library(data.table, warn.conflicts = FALSE, quietly = TRUE)
 
-if (file.exists("./utils.R")) {
-    source("./utils.R")
+if (file.exists("../utils/utils.R")) {
+    source("../utils/utils.R")
 }
 
 # << Options and flags
@@ -165,8 +165,6 @@ for (target_snp in target_snp_vec) {
 
     target_snp_dosage <- genotype_dosage[target_snp, ]
     target_snp_round <- round(target_snp_dosage)
-    print(target_snp_round)
-    print(sapply(target_snp_dosage, function(e){if (e <= 0.5) return(0) else if (e >= 1.5) return(2) else return(1)}))
 
     target_snp_info <- genotype_info[target_snp, ]
 

@@ -31,8 +31,8 @@ library(optparse)
 library(data.table)
 library(MatrixEQTL)
 
-if (file.exists("./utils.R")) {
-    source("./utils.R")
+if (file.exists("../utils/utils.R")) {
+    source("../utils/utils.R")
 }
 
 debug <- FALSE
@@ -312,6 +312,7 @@ pm_seed <- opts$pm_seed
 set.seed(pm_seed)
 
 pm_times <- opts$pm_times
+noFDRsaveMemory <- FALSE
 for (pm in 0:pm_times) {
     # nolint start
     gene <- SlicedData$new()
@@ -322,7 +323,6 @@ for (pm in 0:pm_times) {
     if (pm) {
         cat("Permuted phenotype:", pm, "\n")
         qtls_opt_file <- NULL
-        noFDRsaveMemory <- FALSE
         shuffled_samples <- sample(x = shared_samples, size = n_shared_samples, replace = FALSE)
         pntp_mtrx_4me_4pm <- pntp_mtrx_4me[, shuffled_samples]
         gene$CreateFromMatrix(pntp_mtrx_4me_4pm)
@@ -334,7 +334,6 @@ for (pm in 0:pm_times) {
     } else {
         cat("Raw phenotype\n")
         qtls_opt_file <- as.character(str_glue("qtls_{run_flag}.tsv"))
-        noFDRsaveMemory <- TRUE
         gene$CreateFromMatrix(pntp_mtrx_4me)
     }
 
